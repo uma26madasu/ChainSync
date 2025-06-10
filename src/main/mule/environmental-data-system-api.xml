@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" 
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    
+    <!-- GET /environmental-data -->
+    <flow name="get:\environmental-data:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Environmental Data">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  data: [
+    {
+      stationId: "NYC_CENTRAL_001",
+      city: "New York",
+      country: "US",
+      coordinates: {
+        latitude: 40.7128,
+        longitude: -74.006
+      },
+      airQuality: {
+        aqi: 45,
+        level: "Good",
+        pollutants: {
+          pm25: 8.5,
+          pm10: 15.2,
+          no2: 25.1,
+          o3: 45.3,
+          so2: 2.1,
+          co: 0.3
+        }
+      },
+      weather: {
+        temperature: 22.5,
+        humidity: 65,
+        pressure: 1013.25,
+        windSpeed: 12.5,
+        windDirection: 180,
+        visibility: 10,
+        condition: "Clear"
+      },
+      riskAssessment: {
+        riskScore: 3,
+        emergencyLevel: "LOW",
+        coordinationRequired: false,
+        estimatedResponseTime: "Not required"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    }
+  ],
+  metadata: {
+    totalRecords: 6,
+    recordsReturned: 6,
+    page: 1,
+    hasMore: false,
+    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    filters: {
+      city: null,
+      country: null,
+      minRiskScore: 0,
+      realTimeOnly: true
+    }
+  }
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- GET /environmental-data/{stationId} -->
+    <flow name="get:\environmental-data\(stationId):chainsync-platform-api-config">
+        <ee:transform doc:name="Extract Station ID">
+            <ee:variables>
+                <ee:set-variable variableName="stationId">attributes.uriParams.'stationId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <ee:transform doc:name="Transform Message - Station Not Found">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "STATION_NOT_FOUND",
+    message: "Station not found: " ++ (vars.stationId default "UNKNOWN"),
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+  }
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- POST /environmental-data -->
+    <flow name="post:\environmental-data:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Environmental Data Refresh">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "Environmental data refresh initiated",
+  refreshId: "REFRESH_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
+  estimatedCompletionTime: (now() + |PT5M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- GET /emergency-alerts -->
+    <flow name="get:\emergency-alerts:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Emergency Alerts">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  alerts: [
+    {
+      alertId: "ENV_ALERT_BEI_20250609_001",
+      stationId: "BEI_CENTRAL_001",
+      city: "Beijing",
+      alertLevel: "CRITICAL",
+      riskScore: 9,
+      triggerCondition: "AQI exceeded 150 for 2 hours",
+      coordinationWorkflow: {
+        workflowId: "ENV_WF_20250609_001",
+        meetingScheduled: true,
+        estimatedMeetingTime: "2025-06-09T20:30:00Z",
+        stakeholders: [
+          "Environmental Response Team", 
+          "Public Health Officials", 
+          "Emergency Services"
+        ],
+        actionItems: [
+          "Issue public health advisory", 
+          "Activate air purification systems", 
+          "Monitor vulnerable populations"
+        ]
+      },
+      createdAt: "2025-06-09T18:00:00Z"
+    }
+  ],
+  summary: {
+    totalAlerts: 1,
+    criticalAlerts: 1,
+    emergencyAlerts: 0,
+    warningAlerts: 0
+  },
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- POST /emergency-alerts -->
+    <flow name="post:\emergency-alerts:application\json:chainsync-platform-api-config">
+        <logger level="INFO" message="Creating new emergency alert" doc:name="Logger - Emergency Alert Creation"/>
+        <ee:transform doc:name="Transform Message - Emergency Alert Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "Emergency alert created successfully",
+  alertId: "ENV_ALERT_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- GET /health -->
+    <flow name="get:\health:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Health Status">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  status: "healthy",
+  service: "ChainSync Unified Platform API",
+  version: "v1.0",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  services: {
+    openWeatherMap: {
+      status: "available",
+      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      responseTime: "< 500ms"
+    },
+    airQualityAPI: {
+      status: "available",
+      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      responseTime: "< 300ms"
+    },
+    fleetTelematicsAPI: {
+      status: "available",
+      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      responseTime: "< 200ms"
+    },
+    vehicleDataProvider: {
+      status: "available",
+      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      responseTime: "< 150ms"
+    },
+    slotifyCoordination: {
+      status: "ready",
+      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      description: "Ready to trigger Slotify emergency scheduling"
+    }
+  },
+  features: {
+    environmentalMonitoring: "active",
+    emergencyAlerts: "active",
+    fleetMonitoring: "active",
+    driverPerformance: "active",
+    fleetAlerts: "active",
+    coordinationWorkflows: "ready",
+    emergencyCoordination: "ready",
+    vehicleHealth: "active"
+  },
+  metrics: {
+    activeStations: 6,
+    activeVehicles: 6,
+    activeDrivers: 6,
+    monitoringCoverage: "100%",
+    totalAlerts: 2
+  }
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+</mule>

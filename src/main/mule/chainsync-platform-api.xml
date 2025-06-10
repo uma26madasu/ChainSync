@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" 
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" 
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
+      xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    
+    <!-- Import all modular configuration files -->
+    <import file="global.xml" doc:name="Import Global Configurations"/>
+    <import file="error-handling.xml" doc:name="Import Error Handling"/>
+    <import file="fleet-monitoring-api.xml" doc:name="Import Fleet Monitoring Implementation"/>
+    <import file="environmental-data-system-api.xml" doc:name="Import Environmental Data Implementation"/>
+    
+    <!-- Main API Flow -->
+    <flow name="chainsync-platform-api-main">
+        <http:listener config-ref="chainsync-platform-api-httpListenerConfig" path="/api/*" doc:name="HTTP Listener">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        
+        <apikit:router config-ref="chainsync-platform-api-config" doc:name="APIkit Router"/>
+        
+        <!-- Reference the global error handler -->
+        <error-handler ref="global-error-handler"/>
+    </flow>
+    
+    <!-- API Console Flow -->
+    <flow name="chainsync-platform-api-console">
+        <http:listener config-ref="chainsync-platform-api-httpListenerConfig" path="/console/*" doc:name="HTTP Console">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        
+        <apikit:console config-ref="chainsync-platform-api-config" doc:name="APIkit Console"/>
+        
+        <!-- Reference the console error handler -->
+        <error-handler ref="console-error-handler"/>
+    </flow>
+    
+</mule>

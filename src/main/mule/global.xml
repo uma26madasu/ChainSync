@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" 
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" 
+      xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd">
+    
+    <!-- Configuration Properties -->
+    <configuration-properties file="config.properties" doc:name="Configuration properties"/>
+    
+    <!-- HTTP Listener Configuration -->
+    <http:listener-config name="chainsync-platform-api-httpListenerConfig">
+        <http:listener-connection host="${http.host}" port="${http.port}" />
+    </http:listener-config>
+    
+    <!-- APIKit Configuration -->
+    <apikit:config name="chainsync-platform-api-config" 
+                   api="resource::7a0fad65-fcd2-46b2-98b4-73027e190087:chainsync-platform-api:1.0.0:raml:zip:chainsync-platform-api.raml" 
+                   outboundHeadersMapName="outboundHeaders" 
+                   httpStatusVarName="httpStatus" />
+    
+</mule>

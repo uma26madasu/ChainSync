@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" 
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    
+    <!-- GET /fleet-monitoring -->
+    <flow name="get:\fleet-monitoring:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Fleet Monitoring Data">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  data: [
+    {
+      vehicleId: "TRUCK_001",
+      driverId: "D001",
+      driverName: "John Martinez",
+      vehicleType: "Semi Truck",
+      location: "New York",
+      coordinates: {
+        latitude: 40.7128,
+        longitude: -74.006
+      },
+      telematicsData: {
+        speed: 65,
+        averageSpeed: 58,
+        brakingEvents: 2,
+        accelerationEvents: 1,
+        fuelEfficiency: 24.5,
+        engineStatus: "NORMAL",
+        batteryLevel: 95,
+        tirePressure: "NORMAL",
+        odometerReading: 87500,
+        engineHours: 1750,
+        lastGPSUpdate: "2025-06-09T20:00:00Z"
+      },
+      driverMetrics: {
+        hoursOnDuty: 6.5,
+        milesThisShift: 420,
+        safetyScore: 8,
+        lastBreak: "2025-06-09T14:00:00Z",
+        totalDrivingTime: "6 hours 30 minutes",
+        speedingViolations: 0,
+        idleTime: "15 minutes"
+      },
+      vehicleHealth: {
+        mileage: 87500,
+        lastServiceDate: "2025-05-15",
+        nextServiceDue: 92500,
+        maintenanceStatus: "CURRENT",
+        fuelLevel: 75,
+        engineTemp: 195,
+        oilPressure: "NORMAL",
+        brakeStatus: "GOOD",
+        transmissionStatus: "NORMAL"
+      },
+      riskAssessment: {
+        riskScore: 3,
+        status: "LOW",
+        coordinationRequired: false,
+        estimatedResponseTime: "Not required",
+        riskFactors: [],
+        lastRiskAssessment: "2025-06-09T20:00:00Z",
+        riskTrend: "STABLE"
+      },
+      dataSource: "ChainSync Fleet Monitoring",
+      timestamp: "2025-06-09T20:00:00Z",
+      isRealTime: true
+    }
+  ],
+  metadata: {
+    totalVehicles: 6,
+    recordsReturned: 6,
+    page: 1,
+    hasMore: false,
+    riskSummary: {
+      criticalVehicles: 0,
+      highRiskVehicles: 1,
+      mediumRiskVehicles: 2,
+      lowRiskVehicles: 3
+    },
+    lastUpdated: "2025-06-09T20:00:00Z",
+    filters: {
+      vehicleId: null,
+      driverId: null,
+      location: null,
+      status: null,
+      minRiskScore: 0
+    }
+  }
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- GET /fleet-monitoring/{vehicleId} -->
+    <flow name="get:\fleet-monitoring\(vehicleId):chainsync-platform-api-config">
+        <ee:transform doc:name="Extract Vehicle ID">
+            <ee:variables>
+                <ee:set-variable variableName="vehicleId">attributes.uriParams.'vehicleId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <ee:transform doc:name="Transform Message - Vehicle Not Found">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "VEHICLE_NOT_FOUND",
+    message: "Vehicle not found: " ++ (vars.vehicleId default "UNKNOWN"),
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+  }
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- GET /driver-performance -->
+    <flow name="get:\driver-performance:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Driver Performance">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  period: "week",
+  driverPerformance: {
+    D001: {
+      driverId: "D001",
+      driverName: "John Martinez",
+      vehicleCount: 1,
+      averageRiskScore: 3.2,
+      averageSafetyScore: 8.5,
+      totalMiles: 2150,
+      averageSpeed: 62.5,
+      totalBrakingEvents: 8,
+      averageFuelEfficiency: 24.2,
+      performanceRating: "EXCELLENT",
+      riskLevel: "LOW"
+    }
+  },
+  summary: {
+    totalDrivers: 6,
+    excellentDrivers: 4,
+    riskDrivers: 0,
+    averageFleetSafetyScore: 7.8,
+    averageFleetFuelEfficiency: 23.4
+  },
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- GET /fleet-alerts -->
+    <flow name="get:\fleet-alerts:chainsync-platform-api-config">
+        <ee:transform doc:name="Transform Message - Fleet Alerts">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  alerts: [
+    {
+      alertId: "FLEET_ALERT_20250609_TRUCK_002",
+      vehicleId: "TRUCK_002",
+      driverId: "D002",
+      driverName: "Sarah Johnson",
+      alertType: "SAFETY",
+      alertLevel: "HIGH",
+      riskScore: 7,
+      triggerCondition: "Driver exceeded 8 hours of continuous driving",
+      location: "Chicago, IL",
+      coordinationWorkflow: {
+        workflowId: "FLEET_WF_20250609_002",
+        meetingScheduled: true,
+        estimatedResponseTime: "2025-06-09T16:20:00Z",
+        stakeholders: [
+          "Fleet Manager", 
+          "Safety Coordinator", 
+          "Driver Support Team"
+        ],
+        actionItems: [
+          "Contact driver immediately", 
+          "Assess vehicle condition", 
+          "Schedule inspection"
+        ]
+      },
+      slotifyIntegration: {
+        enabled: true,
+        endpoint: "https://slotify-engine/api/fleet-emergency-scheduling",
+        schedulingWindow: "IMMEDIATE"
+      },
+      createdAt: "2025-06-09T15:00:00Z"
+    }
+  ],
+  summary: {
+    totalAlerts: 1,
+    criticalAlerts: 0,
+    highAlerts: 1,
+    mediumAlerts: 0,
+    vehiclesAffected: 1
+  },
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- POST /fleet-alerts -->
+    <flow name="post:\fleet-alerts:application\json:chainsync-platform-api-config">
+        <logger level="INFO" message="Creating new fleet alert" doc:name="Logger - Fleet Alert Creation"/>
+        <ee:transform doc:name="Transform Message - Fleet Alert Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "Fleet alert created successfully",
+  alertId: "FLEET_ALERT_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+</mule>
