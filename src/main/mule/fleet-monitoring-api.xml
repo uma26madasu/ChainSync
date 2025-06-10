@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns="http://www.mulesoft.org/schema/mule/core" 
-      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
-      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
-      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
-    
-    <!-- GET /fleet-monitoring -->
+
     <flow name="get:\fleet-monitoring:chainsync-platform-api-config">
         <ee:transform doc:name="Transform Message - Fleet Monitoring Data">
             <ee:message>
@@ -97,8 +96,7 @@ output application/json
             </ee:message>
         </ee:transform>
     </flow>
-    
-    <!-- GET /fleet-monitoring/{vehicleId} -->
+
     <flow name="get:\fleet-monitoring\(vehicleId):chainsync-platform-api-config">
         <ee:transform doc:name="Extract Vehicle ID">
             <ee:variables>
@@ -120,8 +118,7 @@ output application/json
             </ee:message>
         </ee:transform>
     </flow>
-    
-    <!-- GET /driver-performance -->
+
     <flow name="get:\driver-performance:chainsync-platform-api-config">
         <ee:transform doc:name="Transform Message - Driver Performance">
             <ee:message>
@@ -157,8 +154,7 @@ output application/json
             </ee:message>
         </ee:transform>
     </flow>
-    
-    <!-- GET /fleet-alerts -->
+
     <flow name="get:\fleet-alerts:chainsync-platform-api-config">
         <ee:transform doc:name="Transform Message - Fleet Alerts">
             <ee:message>
@@ -182,13 +178,13 @@ output application/json
         meetingScheduled: true,
         estimatedResponseTime: "2025-06-09T16:20:00Z",
         stakeholders: [
-          "Fleet Manager", 
-          "Safety Coordinator", 
+          "Fleet Manager",
+          "Safety Coordinator",
           "Driver Support Team"
         ],
         actionItems: [
-          "Contact driver immediately", 
-          "Assess vehicle condition", 
+          "Contact driver immediately",
+          "Assess vehicle condition",
           "Schedule inspection"
         ]
       },
@@ -212,8 +208,7 @@ output application/json
             </ee:message>
         </ee:transform>
     </flow>
-    
-    <!-- POST /fleet-alerts -->
+
     <flow name="post:\fleet-alerts:application\json:chainsync-platform-api-config">
         <logger level="INFO" message="Creating new fleet alert" doc:name="Logger - Fleet Alert Creation"/>
         <ee:transform doc:name="Transform Message - Fleet Alert Response">
@@ -229,5 +224,71 @@ output application/json
             </ee:message>
         </ee:transform>
     </flow>
-    
+
+    <flow name="get:\fleet-monitoring\enhanced:chainsync-platform-api-config">
+        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config" doc:name="Get Fleet Data"/>
+        <ee:transform doc:name="Store Fleet Data">
+            <ee:variables>
+                <ee:set-variable variableName="fleetData">payload</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Environmental Data"/>
+
+        <ee:transform doc:name="Enhance Fleet Data with Environmental Context">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var envData = payload.data
+var fleet = vars.fleetData
+
+fun findClosestEnvironmentalData(lat: Number, lon: Number) = do {
+    var distances = envData map ((station) -> {
+        station: station,
+        distance: sqrt((station.coordinates.latitude - lat) pow 2 + (station.coordinates.longitude - lon) pow 2)
+    })
+    ---
+    (distances orderBy $.distance)[0].station
+}
+
+---
+{
+    data: fleet.data map (vehicle) -> do {
+        var envConditions = findClosestEnvironmentalData(
+            vehicle.coordinates.latitude,
+            vehicle.coordinates.longitude
+        )
+        ---
+        vehicle ++ {
+            environmentalContext: {
+                nearestStation: envConditions.stationId,
+                currentWeather: envConditions.weather.condition,
+                visibility: envConditions.weather.visibility,
+                temperature: envConditions.weather.temperature,
+                airQuality: envConditions.airQuality.level,
+                aqi: envConditions.airQuality.aqi,
+                environmentalRisk: envConditions.riskAssessment.emergencyLevel
+            },
+            enhancedRiskAssessment: {
+                vehicleRisk: vehicle.riskAssessment.riskScore,
+                environmentalRisk: envConditions.riskAssessment.riskScore,
+                combinedRiskScore: min((vehicle.riskAssessment.riskScore + envConditions.riskAssessment.riskScore) / 2, 10),
+                coordinationPriority: if ((vehicle.riskAssessment.riskScore + envConditions.riskAssessment.riskScore) > 10) 
+                                      "URGENT"
+                                   else if ((vehicle.riskAssessment.riskScore + envConditions.riskAssessment.riskScore) > 7) 
+                                      "HIGH"
+                                   else 
+                                      "NORMAL"
+            }
+        }
+    },
+    metadata: (fleet.metadata default {}) ++ {
+        environmentalDataIncluded: true,
+        enhancedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
 </mule>

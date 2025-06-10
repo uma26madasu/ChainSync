@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <!-- OpenWeatherMap API Configuration -->
+    <http:request-config name="OpenWeatherMap_Request_Config" doc:name="OpenWeatherMap HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="api.openweathermap.org" port="443" />
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json" />
+        </http:default-headers>
+    </http:request-config>
+
+    <!-- OpenAQ Air Quality API Configuration -->
+    <http:request-config name="OpenAQ_Request_Config" doc:name="OpenAQ HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="api.openaq.org" port="443" />
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json" />
+        </http:default-headers>
+    </http:request-config>
+
+    <!-- AirVisual API Configuration (Alternative) -->
+    <http:request-config name="AirVisual_Request_Config" doc:name="AirVisual HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="api.airvisual.com" port="443" />
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json" />
+        </http:default-headers>
+    </http:request-config>
+
+</mule>

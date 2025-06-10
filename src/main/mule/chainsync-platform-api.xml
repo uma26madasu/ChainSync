@@ -11,11 +11,16 @@
         http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
     
-    <!-- Import all modular configuration files -->
+    <!-- Import global configuration first -->
     <import file="global.xml" doc:name="Import Global Configurations"/>
+    
+    <!-- Import other configuration files -->
+    <import file="external-api-config.xml" doc:name="Import External API Configurations"/>
+    <import file="environmental-data-integration.xml" doc:name="Import Environmental Data Integration"/>
     <import file="error-handling.xml" doc:name="Import Error Handling"/>
     <import file="fleet-monitoring-api.xml" doc:name="Import Fleet Monitoring Implementation"/>
     <import file="environmental-data-system-api.xml" doc:name="Import Environmental Data Implementation"/>
+    <import file="fleet-environmental-coordination.xml" doc:name="Import Fleet Environmental Coordination"/>
     
     <!-- Main API Flow -->
     <flow name="chainsync-platform-api-main">

@@ -7,95 +7,228 @@
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
     
-    <!-- GET /environmental-data -->
+    <!-- GET /environmental-data - Real-time data from all stations -->
     <flow name="get:\environmental-data:chainsync-platform-api-config">
-        <ee:transform doc:name="Transform Message - Environmental Data">
+        <ee:transform doc:name="Initialize Station List">
+            <ee:variables>
+                <ee:set-variable variableName="stations"><![CDATA[%dw 2.0
+output application/json
+---
+[
+    { id: "NYC_CENTRAL_001", lat: 40.7128, lon: -74.0060, city: "New York", country: "US" },
+    { id: "LON_CENTRAL_001", lat: 51.5074, lon: -0.1278, city: "London", country: "UK" },
+    { id: "TOK_CENTRAL_001", lat: 35.6762, lon: 139.6503, city: "Tokyo", country: "JP" },
+    { id: "BEI_CENTRAL_001", lat: 39.9042, lon: 116.4074, city: "Beijing", country: "CN" },
+    { id: "MUM_CENTRAL_001", lat: 19.0760, lon: 72.8777, city: "Mumbai", country: "IN" },
+    { id: "SYD_CENTRAL_001", lat: -33.8688, lon: 151.2093, city: "Sydney", country: "AU" }
+]]]></ee:set-variable>
+                <ee:set-variable variableName="stationData">[]</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Process each station -->
+        <foreach collection="#[vars.stations]" doc:name="For Each Station">
+            <ee:transform doc:name="Set Station Variables">
+                <ee:variables>
+                    <ee:set-variable variableName="currentStation">payload</ee:set-variable>
+                    <ee:set-variable variableName="latitude">payload.lat as String</ee:set-variable>
+                    <ee:set-variable variableName="longitude">payload.lon as String</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <!-- Fetch weather data -->
+            <flow-ref name="fetch-weather-data-subflow" doc:name="Get Weather Data"/>
+            <ee:transform doc:name="Store Weather Data">
+                <ee:variables>
+                    <ee:set-variable variableName="weatherData">payload</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <!-- Fetch air quality data -->
+            <flow-ref name="fetch-air-quality-data-subflow" doc:name="Get Air Quality Data"/>
+            <ee:transform doc:name="Store Air Quality Data">
+                <ee:variables>
+                    <ee:set-variable variableName="airQualityData">payload</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <!-- Combine data for this station -->
+            <ee:transform doc:name="Build Station Data">
+                <ee:variables>
+                    <ee:set-variable variableName="stationData"><![CDATA[%dw 2.0
+output application/json
+---
+vars.stationData + [{
+    stationId: vars.currentStation.id,
+    city: vars.currentStation.city,
+    country: vars.currentStation.country,
+    coordinates: {
+        latitude: vars.currentStation.lat,
+        longitude: vars.currentStation.lon
+    },
+    airQuality: vars.airQualityData,
+    weather: vars.weatherData,
+    riskAssessment: {
+        riskScore: calculateRiskScore(vars.airQualityData.aqi, vars.weatherData),
+        emergencyLevel: determineEmergencyLevel(calculateRiskScore(vars.airQualityData.aqi, vars.weatherData)),
+        coordinationRequired: calculateRiskScore(vars.airQualityData.aqi, vars.weatherData) >= 7,
+        estimatedResponseTime: if (calculateRiskScore(vars.airQualityData.aqi, vars.weatherData) >= 7) "15 minutes" else "Not required"
+    },
+    dataSource: "ChainSync Environmental Monitoring",
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    isRealTime: true
+}]]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </foreach>
+        
+        <!-- Build final response -->
+        <ee:transform doc:name="Transform Message - Environmental Data Response">
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
-  data: [
-    {
-      stationId: "NYC_CENTRAL_001",
-      city: "New York",
-      country: "US",
-      coordinates: {
-        latitude: 40.7128,
-        longitude: -74.006
-      },
-      airQuality: {
-        aqi: 45,
-        level: "Good",
-        pollutants: {
-          pm25: 8.5,
-          pm10: 15.2,
-          no2: 25.1,
-          o3: 45.3,
-          so2: 2.1,
-          co: 0.3
+    data: vars.stationData,
+    metadata: {
+        totalRecords: sizeOf(vars.stationData),
+        recordsReturned: sizeOf(vars.stationData),
+        page: 1,
+        hasMore: false,
+        lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+        filters: {
+            city: attributes.queryParams.city default null,
+            country: attributes.queryParams.country default null,
+            minRiskScore: attributes.queryParams.minRiskScore as Number default 0,
+            realTimeOnly: true
         }
-      },
-      weather: {
-        temperature: 22.5,
-        humidity: 65,
-        pressure: 1013.25,
-        windSpeed: 12.5,
-        windDirection: 180,
-        visibility: 10,
-        condition: "Clear"
-      },
-      riskAssessment: {
-        riskScore: 3,
-        emergencyLevel: "LOW",
-        coordinationRequired: false,
-        estimatedResponseTime: "Not required"
-      },
-      dataSource: "ChainSync Environmental Monitoring",
-      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      isRealTime: true
     }
-  ],
-  metadata: {
-    totalRecords: 6,
-    recordsReturned: 6,
-    page: 1,
-    hasMore: false,
-    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-    filters: {
-      city: null,
-      country: null,
-      minRiskScore: 0,
-      realTimeOnly: true
-    }
-  }
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+}]]></ee:set-payload>
             </ee:message>
         </ee:transform>
     </flow>
     
-    <!-- GET /environmental-data/{stationId} -->
+    <!-- GET /environmental-data/{stationId} - Real-time data for specific station -->
     <flow name="get:\environmental-data\(stationId):chainsync-platform-api-config">
-        <ee:transform doc:name="Extract Station ID">
+        <ee:transform doc:name="Extract Station Info">
             <ee:variables>
                 <ee:set-variable variableName="stationId">attributes.uriParams.'stationId'</ee:set-variable>
+                <ee:set-variable variableName="stationInfo"><![CDATA[%dw 2.0
+output application/json
+var stations = {
+    "NYC_CENTRAL_001": { lat: 40.7128, lon: -74.0060, city: "New York", country: "US" },
+    "LON_CENTRAL_001": { lat: 51.5074, lon: -0.1278, city: "London", country: "UK" },
+    "TOK_CENTRAL_001": { lat: 35.6762, lon: 139.6503, city: "Tokyo", country: "JP" },
+    "BEI_CENTRAL_001": { lat: 39.9042, lon: 116.4074, city: "Beijing", country: "CN" },
+    "MUM_CENTRAL_001": { lat: 19.0760, lon: 72.8777, city: "Mumbai", country: "IN" },
+    "SYD_CENTRAL_001": { lat: -33.8688, lon: 151.2093, city: "Sydney", country: "AU" }
+}
+---
+stations[vars.stationId]]]></ee:set-variable>
             </ee:variables>
         </ee:transform>
-        <ee:transform doc:name="Transform Message - Station Not Found">
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
+        
+        <choice doc:name="Check if Station Exists">
+            <when expression="#[vars.stationInfo != null]">
+                <ee:transform doc:name="Set Coordinates">
+                    <ee:variables>
+                        <ee:set-variable variableName="latitude">vars.stationInfo.lat as String</ee:set-variable>
+                        <ee:set-variable variableName="longitude">vars.stationInfo.lon as String</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+                
+                <!-- Fetch real-time data -->
+                <flow-ref name="fetch-weather-data-subflow" doc:name="Get Weather Data"/>
+                <ee:transform doc:name="Store Weather Data">
+                    <ee:variables>
+                        <ee:set-variable variableName="weatherData">payload</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+                
+                <flow-ref name="fetch-air-quality-data-subflow" doc:name="Get Air Quality Data"/>
+                <ee:transform doc:name="Store Air Quality Data">
+                    <ee:variables>
+                        <ee:set-variable variableName="airQualityData">payload</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+                
+                <ee:transform doc:name="Transform Message - Station Data">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
-  error: {
-    code: "STATION_NOT_FOUND",
-    message: "Station not found: " ++ (vars.stationId default "UNKNOWN"),
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-  }
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
+    stationId: vars.stationId,
+    city: vars.stationInfo.city,
+    country: vars.stationInfo.country,
+    coordinates: {
+        latitude: vars.stationInfo.lat,
+        longitude: vars.stationInfo.lon
+    },
+    airQuality: vars.airQualityData,
+    weather: vars.weatherData,
+    riskAssessment: {
+        riskScore: calculateRiskScore(vars.airQualityData.aqi, vars.weatherData),
+        emergencyLevel: determineEmergencyLevel(calculateRiskScore(vars.airQualityData.aqi, vars.weatherData)),
+        coordinationRequired: calculateRiskScore(vars.airQualityData.aqi, vars.weatherData) >= 7,
+        estimatedResponseTime: if (calculateRiskScore(vars.airQualityData.aqi, vars.weatherData) >= 7) "15 minutes" else "Not required"
+    },
+    dataSource: "ChainSync Environmental Monitoring",
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    isRealTime: true
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <ee:transform doc:name="Transform Message - Station Not Found">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "STATION_NOT_FOUND",
+        message: "Station not found: " ++ (vars.stationId default "UNKNOWN"),
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </otherwise>
+        </choice>
     </flow>
+    
+    <!-- Helper functions for risk calculation -->
+    <configuration doc:name="Risk Assessment Functions">
+        <expression-language>
+            <global-functions><![CDATA[
+fun calculateRiskScore(aqi: Number, weather: Object) = do {
+    var aqiScore = if (aqi <= 50) 1
+                   else if (aqi <= 100) 3
+                   else if (aqi <= 150) 5
+                   else if (aqi <= 200) 7
+                   else if (aqi <= 300) 9
+                   else 10
+    
+    var weatherScore = if (weather.visibility < 2) 2
+                      else if (weather.visibility < 5) 1
+                      else 0
+    
+    min(aqiScore + weatherScore, 10)
+}
+
+fun determineEmergencyLevel(riskScore: Number) = 
+    if (riskScore <= 3) "LOW"
+    else if (riskScore <= 6) "MEDIUM"
+    else if (riskScore <= 8) "HIGH"
+    else "CRITICAL"
+            ]]></global-functions>
+        </expression-language>
+    </configuration>
     
     <!-- POST /environmental-data -->
     <flow name="post:\environmental-data:chainsync-platform-api-config">
@@ -105,72 +238,83 @@ output application/json
 output application/json
 ---
 {
-  message: "Environmental data refresh initiated",
-  refreshId: "REFRESH_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
-  estimatedCompletionTime: (now() + |PT5M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+    message: "Environmental data refresh initiated",
+    refreshId: "REFRESH_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
+    estimatedCompletionTime: (now() + |PT5M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    note: "Real-time data is fetched on each request"
+}]]></ee:set-payload>
             </ee:message>
         </ee:transform>
     </flow>
     
-    <!-- GET /emergency-alerts -->
+    <!-- GET /emergency-alerts - Dynamic alerts based on real-time data -->
     <flow name="get:\emergency-alerts:chainsync-platform-api-config">
-        <ee:transform doc:name="Transform Message - Emergency Alerts">
+        <!-- First, fetch current data to check for emergencies -->
+        <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Current Environmental Data"/>
+        
+        <ee:transform doc:name="Generate Emergency Alerts">
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+var criticalStations = payload.data filter ($.riskAssessment.riskScore >= 7)
 ---
 {
-  alerts: [
-    {
-      alertId: "ENV_ALERT_BEI_20250609_001",
-      stationId: "BEI_CENTRAL_001",
-      city: "Beijing",
-      alertLevel: "CRITICAL",
-      riskScore: 9,
-      triggerCondition: "AQI exceeded 150 for 2 hours",
-      coordinationWorkflow: {
-        workflowId: "ENV_WF_20250609_001",
-        meetingScheduled: true,
-        estimatedMeetingTime: "2025-06-09T20:30:00Z",
-        stakeholders: [
-          "Environmental Response Team", 
-          "Public Health Officials", 
-          "Emergency Services"
-        ],
-        actionItems: [
-          "Issue public health advisory", 
-          "Activate air purification systems", 
-          "Monitor vulnerable populations"
-        ]
-      },
-      createdAt: "2025-06-09T18:00:00Z"
-    }
-  ],
-  summary: {
-    totalAlerts: 1,
-    criticalAlerts: 1,
-    emergencyAlerts: 0,
-    warningAlerts: 0
-  },
-  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+    alerts: criticalStations map ((station, index) -> {
+        alertId: "ENV_ALERT_" ++ station.city[0 to 2] ++ "_" ++ (now() as String {format: "yyyyMMdd"}) ++ "_" ++ (index + 1),
+        stationId: station.stationId,
+        city: station.city,
+        alertLevel: station.riskAssessment.emergencyLevel,
+        riskScore: station.riskAssessment.riskScore,
+        triggerCondition: if (station.airQuality.aqi > 150) 
+                         "AQI exceeded 150 (currently " ++ station.airQuality.aqi ++ ")"
+                         else "Poor visibility: " ++ station.weather.visibility ++ " km",
+        coordinationWorkflow: {
+            workflowId: "ENV_WF_" ++ (now() as String {format: "yyyyMMdd"}) ++ "_" ++ (index + 1),
+            meetingScheduled: true,
+            estimatedMeetingTime: (now() + |PT30M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+            stakeholders: [
+                "Environmental Response Team", 
+                "Public Health Officials", 
+                "Emergency Services"
+            ],
+            actionItems: if (station.airQuality.aqi > 150) [
+                "Issue public health advisory",
+                "Activate air purification systems",
+                "Monitor vulnerable populations"
+            ] else [
+                "Issue visibility warning",
+                "Alert transportation services",
+                "Monitor weather conditions"
+            ]
+        },
+        createdAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }),
+    summary: {
+        totalAlerts: sizeOf(criticalStations),
+        criticalAlerts: sizeOf(criticalStations filter ($.riskAssessment.emergencyLevel == "CRITICAL")),
+        highAlerts: sizeOf(criticalStations filter ($.riskAssessment.emergencyLevel == "HIGH")),
+        mediumAlerts: sizeOf(criticalStations filter ($.riskAssessment.emergencyLevel == "MEDIUM"))
+    },
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
             </ee:message>
         </ee:transform>
     </flow>
     
     <!-- POST /emergency-alerts -->
     <flow name="post:\emergency-alerts:application\json:chainsync-platform-api-config">
-        <logger level="INFO" message="Creating new emergency alert" doc:name="Logger - Emergency Alert Creation"/>
+        <logger level="INFO" message='#["Creating emergency alert for station: " ++ (payload.stationId default "Unknown")]' doc:name="Logger - Emergency Alert Creation"/>
         <ee:transform doc:name="Transform Message - Emergency Alert Response">
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
-  message: "Emergency alert created successfully",
-  alertId: "ENV_ALERT_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
-  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    message: "Emergency alert created successfully",
+    alertId: "ENV_ALERT_" ++ (now() as String {format: "yyyyMMdd_HHmmss"}),
+    stationId: payload.stationId default "UNKNOWN",
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    coordinationInitiated: true
 }]]></ee:set-payload>
             </ee:message>
         </ee:transform>
@@ -184,55 +328,54 @@ output application/json
 output application/json
 ---
 {
-  status: "healthy",
-  service: "ChainSync Unified Platform API",
-  version: "v1.0",
-  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-  services: {
-    openWeatherMap: {
-      status: "available",
-      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      responseTime: "< 500ms"
+    status: "healthy",
+    service: "ChainSync Unified Platform API",
+    version: "v1.0",
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    services: {
+        openWeatherMap: {
+            status: "available",
+            lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+            responseTime: "< 500ms",
+            apiKeyConfigured: p('openweathermap.api.key') != "YOUR_OPENWEATHERMAP_API_KEY"
+        },
+        openAQ: {
+            status: "available",
+            lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+            responseTime: "< 300ms",
+            note: "No API key required"
+        },
+        airVisual: {
+            status: if (p('airvisual.api.key') != "YOUR_AIRVISUAL_API_KEY") "available" else "not configured",
+            lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+            responseTime: "< 300ms",
+            apiKeyConfigured: p('airvisual.api.key') != "YOUR_AIRVISUAL_API_KEY"
+        },
+        slotifyCoordination: {
+            status: "ready",
+            lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+            description: "Ready to trigger Slotify emergency scheduling"
+        }
     },
-    airQualityAPI: {
-      status: "available",
-      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      responseTime: "< 300ms"
+    features: {
+        environmentalMonitoring: "active",
+        emergencyAlerts: "active",
+        fleetMonitoring: "active",
+        driverPerformance: "active",
+        fleetAlerts: "active",
+        coordinationWorkflows: "ready",
+        emergencyCoordination: "ready",
+        vehicleHealth: "active",
+        realTimeData: "active"
     },
-    fleetTelematicsAPI: {
-      status: "available",
-      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      responseTime: "< 200ms"
-    },
-    vehicleDataProvider: {
-      status: "available",
-      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      responseTime: "< 150ms"
-    },
-    slotifyCoordination: {
-      status: "ready",
-      lastCheck: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-      description: "Ready to trigger Slotify emergency scheduling"
+    metrics: {
+        activeStations: 6,
+        activeVehicles: 6,
+        activeDrivers: 6,
+        monitoringCoverage: "100%",
+        dataSource: "Real-time APIs"
     }
-  },
-  features: {
-    environmentalMonitoring: "active",
-    emergencyAlerts: "active",
-    fleetMonitoring: "active",
-    driverPerformance: "active",
-    fleetAlerts: "active",
-    coordinationWorkflows: "ready",
-    emergencyCoordination: "ready",
-    vehicleHealth: "active"
-  },
-  metrics: {
-    activeStations: 6,
-    activeVehicles: 6,
-    activeDrivers: 6,
-    monitoringCoverage: "100%",
-    totalAlerts: 2
-  }
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+}]]></ee:set-payload>
             </ee:message>
         </ee:transform>
     </flow>

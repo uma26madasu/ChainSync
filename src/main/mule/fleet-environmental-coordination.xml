@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Fleet Coordination Recommendations Flow -->
+    <flow name="get:\fleet-coordination\recommendations:chainsync-platform-api-config">
+        <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Environmental Data"/>
+        <ee:transform doc:name="Store Environmental Data">
+            <ee:variables>
+                <ee:set-variable variableName="environmentalData">payload</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config" doc:name="Get Fleet Data"/>
+        <ee:transform doc:name="Store Fleet Data">
+            <ee:variables>
+                <ee:set-variable variableName="fleetData">payload</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <ee:transform doc:name="Generate Fleet Coordination Recommendations">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var envData = vars.environmentalData.data
+var fleetData = vars.fleetData.data
+
+fun findNearestStation(lat: Number, lon: Number) =
+    (envData map ((station) -> {
+        station: station,
+        distance: sqrt(pow(station.coordinates.latitude - lat, 2) + pow(station.coordinates.longitude - lon, 2))
+    }) orderBy $.distance)[0].station
+
+fun generateRecommendations(vehicle, envData) =
+    []
+    ++ (if (envData.weather.visibility < 5) ["Reduce speed due to low visibility: " ++ envData.weather.visibility ++ " km"] else [])
+    ++ (if (envData.airQuality.aqi > 150) ["Ensure cabin air filtration is active - Poor air quality (AQI: " ++ envData.airQuality.aqi ++ ")"] else [])
+    ++ (if (envData.weather.windSpeed > 20) ["High wind alert: " ++ envData.weather.windSpeed ++ " m/s - Exercise caution"] else [])
+    ++ (if (vehicle.driverMetrics.hoursOnDuty > 7 and envData.weather.visibility < 10) ["Consider mandatory break - Long hours + reduced visibility"] else [])
+    ++ (if (vehicle.vehicleHealth.fuelLevel < 25 and envData.weather.condition != "Clear") ["Refuel soon - Weather conditions may affect fuel consumption"] else [])
+    ++ (if (envData.weather.temperature > 35) ["Monitor engine temperature - High ambient temperature"] else [])
+    ++ (if (envData.weather.temperature < 0) ["Check tire pressure - Cold weather advisory"] else [])
+
+fun identifyRiskFactors(vehicle, envData) =
+    {
+        environmental: []
+            ++ (if (envData.weather.visibility < 5) ["Low visibility"] else [])
+            ++ (if (envData.airQuality.aqi > 150) ["Poor air quality"] else [])
+            ++ (if (envData.weather.windSpeed > 20) ["High winds"] else [])
+            ++ (if (envData.weather.temperature > 35 or envData.weather.temperature < 0) ["Extreme temperature"] else []),
+        vehicle: []
+            ++ (if (vehicle.vehicleHealth.fuelLevel < 25) ["Low fuel"] else [])
+            ++ (if (vehicle.vehicleHealth.maintenanceStatus != "CURRENT") ["Maintenance due"] else []),
+        driver: []
+            ++ (if (vehicle.driverMetrics.hoursOnDuty > 8) ["Extended driving hours"] else [])
+            ++ (if (vehicle.driverMetrics.speedingViolations > 0) ["Recent speeding"] else [])
+    }
+
+fun calculateActionPriority(vehicle, envData) =
+    if (envData.riskAssessment.riskScore >= 7 or vehicle.driverMetrics.hoursOnDuty > 10) "IMMEDIATE"
+    else if (envData.riskAssessment.riskScore >= 5 or vehicle.driverMetrics.hoursOnDuty > 8) "HIGH"
+    else if (envData.riskAssessment.riskScore >= 3) "MEDIUM"
+    else "LOW"
+
+fun generateVehicleRecommendations(vehicle) = do {
+    var nearestStation = findNearestStation(vehicle.coordinates.latitude, vehicle.coordinates.longitude)
+    var envConditions = nearestStation
+    ---
+    {
+        vehicleId: vehicle.vehicleId,
+        driverName: vehicle.driverName,
+        currentLocation: vehicle.location,
+        environmentalConditions: {
+            weather: envConditions.weather.condition,
+            temperature: envConditions.weather.temperature,
+            visibility: envConditions.weather.visibility,
+            airQuality: envConditions.airQuality.level,
+            aqi: envConditions.airQuality.aqi
+        },
+        recommendations: generateRecommendations(vehicle, envConditions),
+        riskFactors: identifyRiskFactors(vehicle, envConditions),
+        actionPriority: calculateActionPriority(vehicle, envConditions)
+    }
+}
+
+---
+{
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    fleetCoordinationRecommendations: fleetData map generateVehicleRecommendations,
+    summary: {
+        totalVehicles: sizeOf(fleetData),
+        vehiclesInRiskAreas: sizeOf(fleetData filter ((v) ->
+            (findNearestStation(v.coordinates.latitude, v.coordinates.longitude).riskAssessment.riskScore >= 5)
+        )),
+        immediateActionRequired: sizeOf(fleetData filter ((v) ->
+            calculateActionPriority(v, findNearestStation(v.coordinates.latitude, v.coordinates.longitude)) == "IMMEDIATE"
+        )),
+        weatherAdvisories: sizeOf(envData filter ($.weather.visibility < 10 or $.weather.windSpeed > 15)),
+        airQualityAlerts: sizeOf(envData filter ($.airQuality.aqi > 100))
+    },
+    coordinationActions: {
+        rerouting: generateReroutingSuggestions(fleetData, envData),
+        scheduling: generateSchedulingAdjustments(fleetData, envData),
+        alerts: generateFleetWideAlerts(envData)
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Route Optimization Flow -->
+    <flow name="get:\fleet-coordination\routes:chainsync-platform-api-config">
+        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config"/>
+        <ee:transform doc:name="Generate Route Optimization Plans">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var fleet = payload.data
+---
+{
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    optimizedRoutes: fleet map (vehicle) -> {
+        vehicleId: vehicle.vehicleId,
+        currentLocation: vehicle.location,
+        optimizedPath: ["Waypoint A", "Waypoint B", "Destination"], // Replace with real logic
+        estimatedArrival: "2025-06-10T17:45:00Z"
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Driver Safety Alerts Flow -->
+    <flow name="get:\fleet-coordination\safety-alerts:chainsync-platform-api-config">
+        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config"/>
+        <ee:transform doc:name="Generate Driver Safety Alerts">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var fleet = payload.data
+fun detectFatigue(driverMetrics) =
+    if (driverMetrics.hoursOnDuty > 9) "High fatigue risk"
+    else if (driverMetrics.hoursOnDuty > 6) "Moderate fatigue risk"
+    else null
+
+---
+{
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    driverSafetyAlerts: fleet filter (v) -> detectFatigue(v.driverMetrics) != null map (vehicle) -> {
+        vehicleId: vehicle.vehicleId,
+        driverName: vehicle.driverName,
+        fatigueAlert: detectFatigue(vehicle.driverMetrics),
+        violations: vehicle.driverMetrics.speedingViolations
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+</mule>

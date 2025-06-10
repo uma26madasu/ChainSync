@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <!-- Sub-flow to fetch weather data from OpenWeatherMap -->
+    <sub-flow name="fetch-weather-data-subflow" doc:name="Fetch Weather Data">
+        <ee:transform doc:name="Prepare Weather Request">
+            <ee:variables>
+                <ee:set-variable variableName="weatherApiKey"><![CDATA[p('openweathermap.api.key')]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <try doc:name="Try Weather API Call">
+            <http:request method="GET" config-ref="OpenWeatherMap_Request_Config" 
+                          path="/data/${openweathermap.api.version}/weather"
+                          doc:name="Call OpenWeatherMap API">
+                <http:query-params><![CDATA[#[{
+                    'lat': vars.latitude,
+                    'lon': vars.longitude,
+                    'appid': vars.weatherApiKey,
+                    'units': p('openweathermap.units')
+                }]]]></http:query-params>
+                <http:response-validator>
+                    <http:success-status-code-validator values="200"/>
+                </http:response-validator>
+            </http:request>
+            
+            <ee:transform doc:name="Transform Weather Response">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    temperature: payload.main.temp,
+    humidity: payload.main.humidity,
+    pressure: payload.main.pressure,
+    windSpeed: payload.wind.speed,
+    windDirection: payload.wind.deg default 0,
+    visibility: (payload.visibility default 10000) / 1000, // Convert to km
+    condition: payload.weather[0].main default "Unknown",
+    description: payload.weather[0].description default "",
+    feelsLike: payload.main.feels_like,
+    tempMin: payload.main.temp_min,
+    tempMax: payload.main.temp_max
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <error-handler>
+                <on-error-continue type="HTTP:CONNECTIVITY, HTTP:TIMEOUT, ANY">
+                    <ee:transform doc:name="Weather API Error Response">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    temperature: 0,
+    humidity: 0,
+    pressure: 0,
+    windSpeed: 0,
+    windDirection: 0,
+    visibility: 0,
+    condition: "API Unavailable",
+    error: "Weather service temporarily unavailable"
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <!-- Sub-flow to fetch air quality data from OpenAQ -->
+    <sub-flow name="fetch-air-quality-data-subflow" doc:name="Fetch Air Quality Data">
+        <try doc:name="Try Air Quality API Call">
+            <http:request method="GET" config-ref="OpenAQ_Request_Config" 
+                          path="/${openaq.api.version}/latest"
+                          doc:name="Call OpenAQ API">
+                <http:query-params><![CDATA[#[{
+                    'coordinates': vars.latitude ++ ',' ++ vars.longitude,
+                    'radius': '25000', // 25km radius
+                    'limit': '1'
+                }]]]></http:query-params>
+                <http:response-validator>
+                    <http:success-status-code-validator values="200"/>
+                </http:response-validator>
+            </http:request>
+            
+            <ee:transform doc:name="Transform Air Quality Response">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var measurements = payload.results[0].measurements default []
+var getPollutant = (param: String) -> (measurements filter ($.parameter == param))[0].value default 0
+---
+{
+    aqi: calculateAQI(measurements),
+    level: getAQILevel(calculateAQI(measurements)),
+    pollutants: {
+        pm25: getPollutant("pm25"),
+        pm10: getPollutant("pm10"),
+        no2: getPollutant("no2"),
+        o3: getPollutant("o3"),
+        so2: getPollutant("so2"),
+        co: getPollutant("co")
+    },
+    lastUpdated: measurements[0].lastUpdated default now()
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <error-handler>
+                <on-error-continue type="HTTP:CONNECTIVITY, HTTP:TIMEOUT, ANY">
+                    <ee:transform doc:name="Air Quality API Error Response">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    aqi: 0,
+    level: "Unknown",
+    pollutants: {
+        pm25: 0,
+        pm10: 0,
+        no2: 0,
+        o3: 0,
+        so2: 0,
+        co: 0
+    },
+    error: "Air quality service temporarily unavailable"
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <!-- Helper functions for AQI calculation -->
+    <configuration doc:name="Configuration">
+        <expression-language>
+            <global-functions><![CDATA[
+fun calculateAQI(measurements) = do {
+    var pm25 = (measurements filter ($.parameter == "pm25"))[0].value default 0
+    var pm10 = (measurements filter ($.parameter == "pm10"))[0].value default 0
+    
+    // Simplified AQI calculation based on PM2.5
+    if (pm25 <= 12.0) floor((50/12.0) * pm25)
+    else if (pm25 <= 35.4) floor(((100-51)/(35.4-12.1)) * (pm25-12.1) + 51)
+    else if (pm25 <= 55.4) floor(((150-101)/(55.4-35.5)) * (pm25-35.5) + 101)
+    else if (pm25 <= 150.4) floor(((200-151)/(150.4-55.5)) * (pm25-55.5) + 151)
+    else if (pm25 <= 250.4) floor(((300-201)/(250.4-150.5)) * (pm25-150.5) + 201)
+    else 301
+}
+
+fun getAQILevel(aqi: Number) = 
+    if (aqi <= 50) "Good"
+    else if (aqi <= 100) "Moderate"
+    else if (aqi <= 150) "Unhealthy for Sensitive Groups"
+    else if (aqi <= 200) "Unhealthy"
+    else if (aqi <= 300) "Very Unhealthy"
+    else "Hazardous"
+            ]]></global-functions>
+        </expression-language>
+    </configuration>
+
+    <!-- Station configuration with real coordinates -->
+    <configuration doc:name="Station Configuration">
+        <expression-language>
+            <global-functions><![CDATA[
+var stationCoordinates = {
+    "NYC_CENTRAL_001": { lat: 40.7128, lon: -74.0060, city: "New York", country: "US" },
+    "LON_CENTRAL_001": { lat: 51.5074, lon: -0.1278, city: "London", country: "UK" },
+    "TOK_CENTRAL_001": { lat: 35.6762, lon: 139.6503, city: "Tokyo", country: "JP" },
+    "BEI_CENTRAL_001": { lat: 39.9042, lon: 116.4074, city: "Beijing", country: "CN" },
+    "MUM_CENTRAL_001": { lat: 19.0760, lon: 72.8777, city: "Mumbai", country: "IN" },
+    "SYD_CENTRAL_001": { lat: -33.8688, lon: 151.2093, city: "Sydney", country: "AU" }
+}
+            ]]></global-functions>
+        </expression-language>
+    </configuration>
+
+</mule>
