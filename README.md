@@ -78,6 +78,27 @@ ChainSync is an enterprise-grade platform that combines environmental monitoring
    openweathermap.api.key=YOUR_API_KEY_HERE
    airvisual.api.key=YOUR_API_KEY_HERE
    ```
+   🔑 How to Get API Keys:
+ 🌤️ OpenWeatherMap (Weather Data)
+
+ Visit: https://openweathermap.org/api
+ Sign up for free account
+ Verify email
+ Get API key from dashboard
+ Wait 10 minutes for activation
+
+🌬️ AirVisual (Air Quality Data)
+
+Visit: https://www.iqair.com/air-pollution-data-api
+Get free API key
+Fill registration form
+Verify email
+Access key in dashboard
+
+💡 Important Notes:
+✅ Free tiers available for both services
+✅ App works without keys (uses mock data)
+✅ Rate limits: OpenWeatherMap (1K/day), AirVisual (10K/month)
 
 4. **Run the Application**
    - Right-click project → Run As → Mule Application
