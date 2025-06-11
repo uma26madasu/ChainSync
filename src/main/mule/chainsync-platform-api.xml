@@ -18,11 +18,16 @@
     <import file="external-api-config.xml" doc:name="Import External API Configurations"/>
     <import file="environmental-data-integration.xml" doc:name="Import Environmental Data Integration"/>
     <import file="error-handling.xml" doc:name="Import Error Handling"/>
+    
+    <!-- Import the environmental data implementation that you have -->
+    <import file="environmental-data-impl.xml" doc:name="Import Environmental Data Implementation"/>
+    
+    <!-- Import fleet monitoring and coordination -->
     <import file="fleet-monitoring-api.xml" doc:name="Import Fleet Monitoring Implementation"/>
-    <import file="environmental-data-system-api.xml" doc:name="Import Environmental Data Implementation"/>
+    <import file="environmental-data-system-api.xml" doc:name="Import Environmental Data System API"/>
     <import file="fleet-environmental-coordination.xml" doc:name="Import Fleet Environmental Coordination"/>
     
-    <!-- Main API Flow -->
+    <!-- Main API Flow with APIkit Router -->
     <flow name="chainsync-platform-api-main">
         <http:listener config-ref="chainsync-platform-api-httpListenerConfig" path="/api/*" doc:name="HTTP Listener">
             <http:response statusCode="#[vars.httpStatus default 200]">
@@ -34,13 +39,14 @@
             </http:error-response>
         </http:listener>
         
+        <!-- APIkit Router - handles routing based on RAML -->
         <apikit:router config-ref="chainsync-platform-api-config" doc:name="APIkit Router"/>
         
         <!-- Reference the global error handler -->
         <error-handler ref="global-error-handler"/>
     </flow>
     
-    <!-- API Console Flow -->
+    <!-- Professional APIkit Console Flow -->
     <flow name="chainsync-platform-api-console">
         <http:listener config-ref="chainsync-platform-api-httpListenerConfig" path="/console/*" doc:name="HTTP Console">
             <http:response statusCode="#[vars.httpStatus default 200]">
@@ -52,6 +58,7 @@
             </http:error-response>
         </http:listener>
         
+        <!-- APIkit Console - Professional API documentation -->
         <apikit:console config-ref="chainsync-platform-api-config" doc:name="APIkit Console"/>
         
         <!-- Reference the console error handler -->

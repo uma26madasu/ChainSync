@@ -7,102 +7,35 @@
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
-    <configuration doc:name="Fleet Coordination Functions">
-        <expression-language>
-            <global-functions><![CDATA[
-fun generateReroutingSuggestions(fleetData, envData) =
-    envData
-        filter ($.riskAssessment.riskScore > 6)
-        map ((station) -> {
-            affectedArea: station.city,
-            riskLevel: station.riskAssessment.emergencyLevel,
-            suggestion: "Reroute vehicles away from " ++ station.city,
-            affectedVehicles: sizeOf(fleetData filter ($.location == station.city))
-        })
-
-fun generateSchedulingAdjustments(fleetData, envData) =
-    {
-        delayDepartures: sizeOf(envData filter ($.weather.visibility < 5)),
-        extendDeliveryWindows: sizeOf(envData filter ($.riskAssessment.riskScore > 5)),
-        prioritizeRegions: (envData filter ($.riskAssessment.riskScore < 3) map $.city)
-    }
-
-fun generateFleetWideAlerts(envData) =
-    (envData filter ($.riskAssessment.riskScore > 5) map ((station) -> {
-        region: station.city,
-        alert: "Environmental hazard in " ++ station.city ++ " - Risk Level: " ++ station.riskAssessment.emergencyLevel,
-        validUntil: (now() + |PT6H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-    }))
-
-fun calculateOptimalDepartureTime(envData) = do {
-    var currentHour = now() as String {format: "HH"} as Number
-    var optimalHour = if (envData some ($.weather.visibility < 10))
-                      (currentHour + 3) mod 24
-                      else currentHour
-    ---
-    now() + ("PT" ++ (optimalHour - currentHour) ++ "H") as Period
-}
-
-fun identifyFavorableWindows(envData) =
-    [{
-        start: now(),
-        end: now() + |PT2H|,
-        conditions: "Current conditions acceptable"
-    }]
-            ]]></global-functions>
-        </expression-language>
-    </configuration>
-
-    <flow name="get-fleet-coordination-recommendations">
-        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config" doc:id="f856f1e1-8c04-457a-aa31-dd8b7068a364"/>
-        <ee:transform>
-            <ee:variables>
-                <ee:set-variable variableName="environmentalData">payload</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
-        <flow-ref name="get-fleet-monitoring" />
-        <ee:transform>
-            <ee:variables>
-                <ee:set-variable variableName="fleetData">payload</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
+    <!-- Main Fleet Coordination Recommendations Flow -->
+    <flow name="get:\fleet-coordination\recommendations:chainsync-platform-api-config" doc:name="Get Fleet Coordination Recommendations">
+        <scatter-gather>
+            <route>
+                <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Environmental Data"/>
+            </route>
+            <route>
+                <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config" doc:name="Get Fleet Data"/>
+            </route>
+        </scatter-gather>
+        
         <ee:transform>
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
 output application/json
-var envData = vars.environmentalData.data
-var fleetData = vars.fleetData.data
+var envData = payload[0].payload.data
+var fleetData = payload[1].payload.data
 
-// Added type definitions for lat and lon
+// Inline helper functions
 fun findNearestStation(lat: Number, lon: Number) =
     (envData map ((station) -> {
         station: station,
         distance: sqrt(pow(station.coordinates.latitude - lat, 2) + pow(station.coordinates.longitude - lon, 2))
     }) orderBy $.distance)[0].station
 
-fun generateRecommendations(vehicle, env) =
-    []
+fun generateSimpleRecommendations(vehicle, env) = []
     ++ (if (env.weather.visibility < 5) ["Reduce speed due to low visibility"] else [])
-    ++ (if (env.airQuality.aqi > 150) ["Use air filtration - AQI " ++ env.airQuality.aqi] else [])
+    ++ (if (env.airQuality.aqi > 150) ["Use air filtration - AQI " ++ env.airQuality.aqi as String] else [])
     ++ (if (env.weather.windSpeed > 20) ["High wind alert"] else [])
-    ++ (if (vehicle.driverMetrics.hoursOnDuty > 7 and env.weather.visibility < 10) ["Take break - long duty + low visibility"] else [])
-    ++ (if (vehicle.vehicleHealth.fuelLevel < 25 and env.weather.condition != "Clear") ["Refuel soon due to weather"] else [])
-    ++ (if (env.weather.temperature > 35) ["Monitor engine - high temp"] else [])
-    ++ (if (env.weather.temperature < 0) ["Check tire pressure - cold weather"] else [])
-
-fun identifyRiskFactors(vehicle, env) = {
-    environmental: []
-        ++ (if (env.weather.visibility < 5) ["Low visibility"] else [])
-        ++ (if (env.airQuality.aqi > 150) ["Poor air quality"] else [])
-        ++ (if (env.weather.windSpeed > 20) ["High winds"] else [])
-        ++ (if (env.weather.temperature > 35 or env.weather.temperature < 0) ["Extreme temperature"] else []),
-    vehicle: []
-        ++ (if (vehicle.vehicleHealth.fuelLevel < 25) ["Low fuel"] else [])
-        ++ (if (vehicle.vehicleHealth.maintenanceStatus != "CURRENT") ["Maintenance due"] else []),
-    driver: []
-        ++ (if (vehicle.driverMetrics.hoursOnDuty > 8) ["Extended driving hours"] else [])
-        ++ (if (vehicle.driverMetrics.speedingViolations > 0) ["Recent speeding"] else [])
-}
 
 fun calculateActionPriority(vehicle, env) =
     if (env.riskAssessment.riskScore >= 7 or vehicle.driverMetrics.hoursOnDuty > 10) "IMMEDIATE"
@@ -110,30 +43,27 @@ fun calculateActionPriority(vehicle, env) =
     else if (env.riskAssessment.riskScore >= 3) "MEDIUM"
     else "LOW"
 
-fun generateVehicleRecommendations(vehicle) = do {
-    var nearest = findNearestStation(vehicle.coordinates.latitude, vehicle.coordinates.longitude)
-    ---
-    {
-        vehicleId: vehicle.vehicleId,
-        driverName: vehicle.driverName,
-        currentLocation: vehicle.location,
-        environmentalConditions: {
-            weather: nearest.weather.condition,
-            temperature: nearest.weather.temperature,
-            visibility: nearest.weather.visibility,
-            airQuality: nearest.airQuality.level,
-            aqi: nearest.airQuality.aqi
-        },
-        recommendations: generateRecommendations(vehicle, nearest),
-        riskFactors: identifyRiskFactors(vehicle, nearest),
-        actionPriority: calculateActionPriority(vehicle, nearest)
-    }
-}
-
 ---
 {
     timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-    fleetCoordinationRecommendations: fleetData map generateVehicleRecommendations($),
+    fleetCoordinationRecommendations: fleetData map ((vehicle) -> do {
+        var nearest = findNearestStation(vehicle.coordinates.latitude, vehicle.coordinates.longitude)
+        ---
+        {
+            vehicleId: vehicle.vehicleId,
+            driverName: vehicle.driverName,
+            currentLocation: vehicle.location,
+            environmentalConditions: {
+                weather: nearest.weather.condition,
+                temperature: nearest.weather.temperature,
+                visibility: nearest.weather.visibility,
+                airQuality: nearest.airQuality.level,
+                aqi: nearest.airQuality.aqi
+            },
+            recommendations: generateSimpleRecommendations(vehicle, nearest),
+            actionPriority: calculateActionPriority(vehicle, nearest)
+        }
+    }),
     summary: {
         totalVehicles: sizeOf(fleetData),
         vehiclesInRiskAreas: sizeOf(fleetData filter ((v) ->
@@ -144,155 +74,10 @@ fun generateVehicleRecommendations(vehicle) = do {
         )),
         weatherAdvisories: sizeOf(envData filter ($.weather.visibility < 10 or $.weather.windSpeed > 15)),
         airQualityAlerts: sizeOf(envData filter ($.airQuality.aqi > 100))
-    },
-    coordinationActions: {
-        rerouting: generateReroutingSuggestions(fleetData, envData),
-        scheduling: generateSchedulingAdjustments(fleetData, envData),
-        alerts: generateFleetWideAlerts(envData)
     }
 }]]></ee:set-payload>
             </ee:message>
         </ee:transform>
     </flow>
 
-    <flow name="get-fleet-coordination-route-optimization">
-        <ee:transform>
-            <ee:variables>
-                <ee:set-variable variableName="origin">attributes.queryParams.origin default "New York"</ee:set-variable>
-                <ee:set-variable variableName="destination">attributes.queryParams.destination default "Boston"</ee:set-variable>
-                <ee:set-variable variableName="vehicleId">attributes.queryParams.vehicleId default "TRUCK_001"</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
-        <flow-ref name="get-environmental-data" />
-        <ee:transform>
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
-output application/json
-var envData = payload.data
-
-fun assessRouteRisk(stations) = avg(stations map $.riskAssessment.riskScore)
-
-// Added type definitions for origin, destination, and stations
-fun findAlternativeRoute(origin: String, destination: String, stations: Array<Object>) =
-    if (stations some ($.riskAssessment.riskScore > 7))
-        { recommended: true, reason: "Severe environmental conditions detected" }
-    else
-        { recommended: false, reason: "Current route acceptable" }
-
----
-{
-    routeOptimization: {
-        vehicleId: vars.vehicleId,
-        origin: vars.origin,
-        destination: vars.destination,
-        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-        currentRoute: {
-            estimatedTime: "4 hours 30 minutes",
-            distance: "350 km",
-            fuelEstimate: "45 liters",
-            riskScore: assessRouteRisk(envData),
-            environmentalFactors: envData map ((station) -> {
-                location: station.city,
-                conditions: {
-                    weather: station.weather.condition,
-                    visibility: station.weather.visibility ++ " km",
-                    airQuality: station.airQuality.level,
-                    risk: station.riskAssessment.emergencyLevel
-                }
-            })
-        },
-        alternativeRoute: findAlternativeRoute(vars.origin, vars.destination, envData),
-        recommendations: [
-            "Monitor weather in " ++ (envData filter ($.weather.visibility < 10) map $.city joinBy ", "),
-            "Plan refueling stops in cleaner areas",
-            "Schedule breaks during good weather windows"
-        ] filter ($ != "Monitor weather in "),
-        slotifyIntegration: {
-            enabled: true,
-            suggestedDepartureTime: calculateOptimalDepartureTime(envData),
-            weatherWindows: identifyFavorableWindows(envData)
-        }
-    }
-}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
-    </flow>
-
-    <flow name="get-fleet-coordination-driver-safety-alerts">
-        <scatter-gather>
-            <route>
-                <flow-ref name="get-environmental-data" />
-            </route>
-            <route>
-                <flow-ref name="get-fleet-monitoring" />
-            </route>
-        </scatter-gather>
-        <ee:transform>
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
-output application/json
-var envData = payload[0].payload.data
-var fleetData = payload[1].payload.data
-
-fun generateDriverAlert(vehicle, environmentalCondition) = {
-    driverId: vehicle.driverId,
-    driverName: vehicle.driverName,
-    vehicleId: vehicle.vehicleId,
-    currentLocation: vehicle.location,
-    alertLevel: if (environmentalCondition.riskScore > 7) "CRITICAL"
-                else if (environmentalCondition.riskScore > 5) "HIGH"
-                else "MEDIUM",
-    safetyAlerts: []
-        ++ (if (environmentalCondition.visibility < 3) [{
-            "alertType": "VISIBILITY",
-            severity: "HIGH",
-            message: "Low visibility: " ++ environmentalCondition.visibility ++ " km",
-            action: "STOP_WHEN_SAFE"
-        }] else [])
-        ++ (if (environmentalCondition.aqi > 200) [{
-            "alertType": "AIR_QUALITY",
-            severity: "HIGH",
-            message: "Hazardous AQI: " ++ environmentalCondition.aqi,
-            action: "ACTIVATE_CABIN_FILTER"
-        }] else [])
-        ++ (if (vehicle.driverMetrics.hoursOnDuty > 8 and environmentalCondition.riskScore > 5) [{
-            "alertType": "FATIGUE",
-            severity: "CRITICAL",
-            message: "Long hours + poor conditions",
-            action: "MANDATORY_REST"
-        }] else []),
-    coordinationRequired: environmentalCondition.riskScore > 5 or vehicle.driverMetrics.hoursOnDuty > 9,
-    suggestedActions: {
-        immediate: if (environmentalCondition.riskScore > 7) "Find safe stopping location" else "Continue with caution",
-        shortTerm: "Monitor conditions",
-        communication: "Check in every 30 mins"
-    }
-}
-
----
-{
-    driverSafetyAlerts: fleetData flatMap ((vehicle) ->
-        envData
-            filter ($.riskAssessment.riskScore > 3)
-            map ((env) -> generateDriverAlert(vehicle, {
-                visibility: env.weather.visibility,
-                aqi: env.airQuality.aqi,
-                riskScore: env.riskAssessment.riskScore,
-                location: env.city
-            }))
-    ),
-    summary: {
-        totalActiveDrivers: sizeOf(fleetData),
-        criticalAlerts: sizeOf(envData filter ($.riskAssessment.riskScore > 7)),
-        recommendedActions: {
-            immediateStops: sizeOf(envData filter ($.weather.visibility < 3)),
-            routeDiversions: sizeOf(envData filter ($.riskAssessment.riskScore > 7)),
-            restBreaks: sizeOf(fleetData filter ($.driverMetrics.hoursOnDuty > 8))
-        }
-    },
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
-    </flow>
 </mule>

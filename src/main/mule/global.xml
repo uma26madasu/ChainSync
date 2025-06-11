@@ -17,10 +17,17 @@
         <http:listener-connection host="${http.host}" port="${http.port}" />
     </http:listener-config>
     
-    <!-- APIKit Configuration -->
+    <!-- APIKit Configuration - Find your RAML file location first -->
+    <!-- Option 1: If RAML is in src/main/resources/api/ -->
     <apikit:config name="chainsync-platform-api-config" 
-                   api="resource::7a0fad65-fcd2-46b2-98b4-73027e190087:chainsync-platform-api:1.0.0:raml:zip:chainsync-platform-api.raml" 
+                   api="api/chainsync-platform-api.raml" 
                    outboundHeadersMapName="outboundHeaders" 
                    httpStatusVarName="httpStatus" />
+    
+    <!-- Option 2: If RAML is directly in src/main/resources/ -->
+    <!-- <apikit:config name="chainsync-platform-api-config" 
+                   api="chainsync-platform-api.raml" 
+                   outboundHeadersMapName="outboundHeaders" 
+                   httpStatusVarName="httpStatus" /> -->
     
 </mule>

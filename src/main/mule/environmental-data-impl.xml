@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Main Environmental Data Flow -->
+    <flow name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Environmental Data">
+        <ee:transform doc:name="Transform Message - Environmental Data">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  data: [
+    {
+      stationId: "NYC_CENTRAL_001",
+      city: "New York",
+      country: "United States",
+      coordinates: {
+        latitude: 40.7128,
+        longitude: -74.0060
+      },
+      weather: {
+        temperature: 22.5,
+        humidity: 65,
+        pressure: 1013.25,
+        windSpeed: 12,
+        windDirection: 180,
+        visibility: 15,
+        condition: "Partly Cloudy",
+        description: "Partly cloudy with light winds",
+        feelsLike: 24.0,
+        tempMin: 18.0,
+        tempMax: 26.0
+      },
+      airQuality: {
+        aqi: 85,
+        level: "Moderate",
+        pollutants: {
+          pm25: 25.4,
+          pm10: 32.1,
+          no2: 45.2,
+          o3: 78.9,
+          so2: 8.5,
+          co: 0.8
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 4,
+        emergencyLevel: "LOW",
+        coordinationRequired: false,
+        estimatedResponseTime: "Not required",
+        riskFactors: ["Moderate air quality"],
+        lastAssessment: now(),
+        weatherImpact: "MINIMAL",
+        airQualityImpact: "MODERATE"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    },
+    {
+      stationId: "LON_CENTRAL_001",
+      city: "London",
+      country: "United Kingdom",
+      coordinates: {
+        latitude: 51.5074,
+        longitude: -0.1278
+      },
+      weather: {
+        temperature: 15.2,
+        humidity: 78,
+        pressure: 1008.5,
+        windSpeed: 18,
+        windDirection: 240,
+        visibility: 8,
+        condition: "Overcast",
+        description: "Overcast skies with moderate winds",
+        feelsLike: 13.5,
+        tempMin: 12.0,
+        tempMax: 18.0
+      },
+      airQuality: {
+        aqi: 112,
+        level: "Unhealthy for Sensitive Groups",
+        pollutants: {
+          pm25: 35.8,
+          pm10: 45.2,
+          no2: 62.4,
+          o3: 95.1,
+          so2: 12.3,
+          co: 1.2
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 6,
+        emergencyLevel: "MEDIUM",
+        coordinationRequired: true,
+        estimatedResponseTime: "30 minutes",
+        riskFactors: ["Poor air quality", "Reduced visibility"],
+        lastAssessment: now(),
+        weatherImpact: "MODERATE",
+        airQualityImpact: "HIGH"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    },
+    {
+      stationId: "TOK_CENTRAL_001",
+      city: "Tokyo",
+      country: "Japan",
+      coordinates: {
+        latitude: 35.6762,
+        longitude: 139.6503
+      },
+      weather: {
+        temperature: 28.7,
+        humidity: 82,
+        pressure: 1015.8,
+        windSpeed: 8,
+        windDirection: 90,
+        visibility: 12,
+        condition: "Humid",
+        description: "Hot and humid conditions",
+        feelsLike: 32.5,
+        tempMin: 25.0,
+        tempMax: 31.0
+      },
+      airQuality: {
+        aqi: 95,
+        level: "Moderate",
+        pollutants: {
+          pm25: 28.9,
+          pm10: 38.6,
+          no2: 52.1,
+          o3: 82.4,
+          so2: 9.8,
+          co: 1.0
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 5,
+        emergencyLevel: "MEDIUM",
+        coordinationRequired: true,
+        estimatedResponseTime: "45 minutes",
+        riskFactors: ["High humidity", "Elevated temperature"],
+        lastAssessment: now(),
+        weatherImpact: "MODERATE",
+        airQualityImpact: "MODERATE"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    },
+    {
+      stationId: "BEI_CENTRAL_001",
+      city: "Beijing",
+      country: "China",
+      coordinates: {
+        latitude: 39.9042,
+        longitude: 116.4074
+      },
+      weather: {
+        temperature: 25.1,
+        humidity: 45,
+        pressure: 1020.2,
+        windSpeed: 6,
+        windDirection: 45,
+        visibility: 4,
+        condition: "Hazy",
+        description: "Hazy conditions with light winds",
+        feelsLike: 27.0,
+        tempMin: 22.0,
+        tempMax: 28.0
+      },
+      airQuality: {
+        aqi: 178,
+        level: "Unhealthy",
+        pollutants: {
+          pm25: 68.4,
+          pm10: 89.2,
+          no2: 85.7,
+          o3: 45.8,
+          so2: 25.4,
+          co: 2.1
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 8,
+        emergencyLevel: "HIGH",
+        coordinationRequired: true,
+        estimatedResponseTime: "15 minutes",
+        riskFactors: ["Very poor air quality", "Low visibility", "High pollution"],
+        lastAssessment: now(),
+        weatherImpact: "HIGH",
+        airQualityImpact: "CRITICAL"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    },
+    {
+      stationId: "MUM_CENTRAL_001",
+      city: "Mumbai",
+      country: "India",
+      coordinates: {
+        latitude: 19.0760,
+        longitude: 72.8777
+      },
+      weather: {
+        temperature: 32.4,
+        humidity: 88,
+        pressure: 1009.8,
+        windSpeed: 15,
+        windDirection: 200,
+        visibility: 10,
+        condition: "Monsoon",
+        description: "Monsoon conditions with high humidity",
+        feelsLike: 38.5,
+        tempMin: 29.0,
+        tempMax: 35.0
+      },
+      airQuality: {
+        aqi: 145,
+        level: "Unhealthy for Sensitive Groups",
+        pollutants: {
+          pm25: 48.2,
+          pm10: 65.8,
+          no2: 71.4,
+          o3: 98.6,
+          so2: 18.9,
+          co: 1.6
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 7,
+        emergencyLevel: "HIGH",
+        coordinationRequired: true,
+        estimatedResponseTime: "20 minutes",
+        riskFactors: ["Extreme humidity", "Poor air quality", "High temperature"],
+        lastAssessment: now(),
+        weatherImpact: "HIGH",
+        airQualityImpact: "HIGH"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    },
+    {
+      stationId: "SYD_CENTRAL_001",
+      city: "Sydney",
+      country: "Australia",
+      coordinates: {
+        latitude: -33.8688,
+        longitude: 151.2093
+      },
+      weather: {
+        temperature: 19.8,
+        humidity: 55,
+        pressure: 1018.4,
+        windSpeed: 20,
+        windDirection: 300,
+        visibility: 20,
+        condition: "Clear",
+        description: "Clear skies with moderate winds",
+        feelsLike: 18.5,
+        tempMin: 16.0,
+        tempMax: 23.0
+      },
+      airQuality: {
+        aqi: 42,
+        level: "Good",
+        pollutants: {
+          pm25: 12.8,
+          pm10: 18.4,
+          no2: 28.6,
+          o3: 65.2,
+          so2: 4.2,
+          co: 0.5
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 2,
+        emergencyLevel: "LOW",
+        coordinationRequired: false,
+        estimatedResponseTime: "Not required",
+        riskFactors: [],
+        lastAssessment: now(),
+        weatherImpact: "MINIMAL",
+        airQualityImpact: "MINIMAL"
+      },
+      dataSource: "ChainSync Environmental Monitoring",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    }
+  ],
+  metadata: {
+    totalStations: 6,
+    recordsReturned: 6,
+    page: 1,
+    hasMore: false,
+    riskSummary: {
+      criticalStations: 1,
+      highRiskStations: 2,
+      mediumRiskStations: 2,
+      lowRiskStations: 1
+    },
+    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    filters: {
+      stationId: null,
+      city: null,
+      country: null,
+      minRiskScore: 0
+    }
+  }
+} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Individual Station Data Flow -->
+    <flow name="get:\environmental-data\(stationId):chainsync-platform-api-config" doc:name="Get Station Environmental Data">
+        <ee:transform doc:name="Extract Station ID">
+            <ee:variables>
+                <ee:set-variable variableName="stationId">attributes.uriParams.'stationId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <choice doc:name="Choice - Station Selection">
+            <when expression="#[vars.stationId == 'NYC_CENTRAL_001']">
+                <ee:transform doc:name="NYC Station Data">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  stationId: "NYC_CENTRAL_001",
+  city: "New York",
+  country: "United States",
+  coordinates: {
+    latitude: 40.7128,
+    longitude: -74.0060
+  },
+  weather: {
+    temperature: 22.5,
+    humidity: 65,
+    pressure: 1013.25,
+    windSpeed: 12,
+    windDirection: 180,
+    visibility: 15,
+    condition: "Partly Cloudy",
+    description: "Partly cloudy with light winds",
+    feelsLike: 24.0,
+    tempMin: 18.0,
+    tempMax: 26.0
+  },
+  airQuality: {
+    aqi: 85,
+    level: "Moderate",
+    pollutants: {
+      pm25: 25.4,
+      pm10: 32.1,
+      no2: 45.2,
+      o3: 78.9,
+      so2: 8.5,
+      co: 0.8
+    },
+    lastUpdated: now()
+  },
+  riskAssessment: {
+    riskScore: 4,
+    emergencyLevel: "LOW",
+    coordinationRequired: false,
+    estimatedResponseTime: "Not required",
+    riskFactors: ["Moderate air quality"],
+    lastAssessment: now(),
+    weatherImpact: "MINIMAL",
+    airQualityImpact: "MODERATE"
+  },
+  dataSource: "ChainSync Environmental Monitoring",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  isRealTime: true
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <ee:transform doc:name="Default Station Data">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "STATION_NOT_FOUND",
+    message: "Environmental station not found: " ++ (vars.stationId default "UNKNOWN"),
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+  }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </otherwise>
+        </choice>
+    </flow>
+
+    <!-- Simplified Environmental Data Flow (without scatter-gather) -->
+    <flow name="get-environmental-data" doc:name="Get Environmental Data (Internal)">
+        <ee:transform doc:name="Generate Mock Environmental Data">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  data: [
+    {
+      stationId: "NYC_CENTRAL_001",
+      city: "New York",
+      country: "United States",
+      coordinates: {
+        latitude: 40.7128,
+        longitude: -74.0060
+      },
+      weather: {
+        temperature: 22.5,
+        humidity: 65,
+        pressure: 1013.25,
+        windSpeed: 12,
+        windDirection: 180,
+        visibility: 15,
+        condition: "Partly Cloudy",
+        description: "Partly cloudy with light winds",
+        feelsLike: 24.0,
+        tempMin: 18.0,
+        tempMax: 26.0
+      },
+      airQuality: {
+        aqi: 85,
+        level: "Moderate",
+        pollutants: {
+          pm25: 25.4,
+          pm10: 32.1,
+          no2: 45.2,
+          o3: 78.9,
+          so2: 8.5,
+          co: 0.8
+        },
+        lastUpdated: now()
+      },
+      riskAssessment: {
+        riskScore: 4,
+        emergencyLevel: "LOW",
+        coordinationRequired: false,
+        estimatedResponseTime: "Not required",
+        riskFactors: ["Moderate air quality"],
+        lastAssessment: now(),
+        weatherImpact: "MINIMAL",
+        airQualityImpact: "MODERATE"
+      },
+      dataSource: "ChainSync Environmental Monitoring - Internal",
+      timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+      isRealTime: true
+    }
+  ],
+  metadata: {
+    totalStations: 1,
+    recordsReturned: 1,
+    riskSummary: {
+      criticalStations: 0,
+      highRiskStations: 0,
+      mediumRiskStations: 0,
+      lowRiskStations: 1
+    },
+    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+  }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+</mule>
