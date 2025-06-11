@@ -53,17 +53,17 @@ fun identifyFavorableWindows(envData) =
         </expression-language>
     </configuration>
 
-    <flow name="get-fleet-coordination-recommendations">
-        <flow-ref name="get-environmental-data" />
+    <flow name="get-fleet-coordination-recommendations" doc:id="b0a6470d-6215-4994-b587-13e1e3831ec6">
+        <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:id="948e86fe-fc11-4e43-ab64-43af499096bc"/>
         <ee:transform>
             <ee:variables>
-                <ee:set-variable variableName="environmentalData">payload</ee:set-variable>
+                <ee:set-variable variableName="environmentalData"><![CDATA[#[payload]]]></ee:set-variable>
             </ee:variables>
         </ee:transform>
-        <flow-ref name="get-fleet-monitoring" />
+        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config" doc:id="50751ba5-0591-4395-93c8-15b085637db8"/>
         <ee:transform>
             <ee:variables>
-                <ee:set-variable variableName="fleetData">payload</ee:set-variable>
+                <ee:set-variable variableName="fleetData"><![CDATA[#[payload]]]></ee:set-variable>
             </ee:variables>
         </ee:transform>
         <ee:transform>
@@ -83,7 +83,7 @@ fun findNearestStation(lat: Number, lon: Number) =
 fun generateRecommendations(vehicle, env) =
     []
     ++ (if (env.weather.visibility < 5) ["Reduce speed due to low visibility"] else [])
-    ++ (if (env.airQuality.aqi > 150) ["Use air filtration - AQI " ++ env.airQuality.aqi] else [])
+    ++ (if (env.airQuality.aqi > 150) ["Use air filtration - AQI " ++ env.airQuality.aqi as String] else [])
     ++ (if (env.weather.windSpeed > 20) ["High wind alert"] else [])
     ++ (if (vehicle.driverMetrics.hoursOnDuty > 7 and env.weather.visibility < 10) ["Take break - long duty + low visibility"] else [])
     ++ (if (vehicle.vehicleHealth.fuelLevel < 25 and env.weather.condition != "Clear") ["Refuel soon due to weather"] else [])
@@ -158,12 +158,12 @@ fun generateVehicleRecommendations(vehicle) = do {
     <flow name="get-fleet-coordination-route-optimization">
         <ee:transform>
             <ee:variables>
-                <ee:set-variable variableName="origin">attributes.queryParams.origin default "New York"</ee:set-variable>
-                <ee:set-variable variableName="destination">attributes.queryParams.destination default "Boston"</ee:set-variable>
-                <ee:set-variable variableName="vehicleId">attributes.queryParams.vehicleId default "TRUCK_001"</ee:set-variable>
+                <ee:set-variable variableName="origin"><![CDATA[#[attributes.queryParams.origin default "New York"]]]></ee:set-variable>
+                <ee:set-variable variableName="destination"><![CDATA[#[attributes.queryParams.destination default "Boston"]]]></ee:set-variable>
+                <ee:set-variable variableName="vehicleId"><![CDATA[#[attributes.queryParams.vehicleId default "TRUCK_001"]]]></ee:set-variable>
             </ee:variables>
         </ee:transform>
-        <flow-ref name="get-environmental-data" />
+        <flow-ref name="get:\environmental-data\(stationId):chainsync-platform-api-config" doc:id="00ea18b7-8a93-46da-b84a-4de332c4e135"/>
         <ee:transform>
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
@@ -173,7 +173,7 @@ var envData = payload.data
 fun assessRouteRisk(stations) = avg(stations map $.riskAssessment.riskScore)
 
 // Added type definitions for origin, destination, and stations
-fun findAlternativeRoute(origin: String, destination: String, stations: Array<Object>) =
+fun findAlternativeRoute(origin: String, destination: String, stations: Array) =
     if (stations some ($.riskAssessment.riskScore > 7))
         { recommended: true, reason: "Severe environmental conditions detected" }
     else
@@ -195,7 +195,7 @@ fun findAlternativeRoute(origin: String, destination: String, stations: Array<Ob
                 location: station.city,
                 conditions: {
                     weather: station.weather.condition,
-                    visibility: station.weather.visibility ++ " km",
+                    visibility: station.weather.visibility as String ++ " km",
                     airQuality: station.airQuality.level,
                     risk: station.riskAssessment.emergencyLevel
                 }
@@ -218,13 +218,13 @@ fun findAlternativeRoute(origin: String, destination: String, stations: Array<Ob
         </ee:transform>
     </flow>
 
-    <flow name="get-fleet-coordination-driver-safety-alerts">
+    <flow name="get-fleet-coordination-driver-safety-alerts" doc:id="8747a81f-2d6c-4bbc-a43d-aa77d1b6a571">
         <scatter-gather>
             <route>
-                <flow-ref name="get-environmental-data" />
+                <flow-ref name="get-fleet-coordination-driver-safety-alerts" doc:id="65dc57ce-2c7b-4617-8224-771c3131036e"/>
             </route>
             <route>
-                <flow-ref name="get-fleet-monitoring" />
+                <flow-ref name="get-fleet-coordination-recommendations" doc:id="f9c4b74b-244b-457a-94fe-b9984c7b3e1e"/>
             </route>
         </scatter-gather>
         <ee:transform>
@@ -244,19 +244,19 @@ fun generateDriverAlert(vehicle, environmentalCondition) = {
                 else "MEDIUM",
     safetyAlerts: []
         ++ (if (environmentalCondition.visibility < 3) [{
-            "alertType": "VISIBILITY", // Changed 'type' to 'alertType'
+            alertType: "VISIBILITY",
             severity: "HIGH",
-            message: "Low visibility: " ++ environmentalCondition.visibility ++ " km",
+            message: "Low visibility: " ++ environmentalCondition.visibility as String ++ " km",
             action: "STOP_WHEN_SAFE"
         }] else [])
         ++ (if (environmentalCondition.aqi > 200) [{
-            "alertType": "AIR_QUALITY", // Changed 'type' to 'alertType'
+            alertType: "AIR_QUALITY",
             severity: "HIGH",
-            message: "Hazardous AQI: " ++ environmentalCondition.aqi,
+            message: "Hazardous AQI: " ++ environmentalCondition.aqi as String,
             action: "ACTIVATE_CABIN_FILTER"
         }] else [])
         ++ (if (vehicle.driverMetrics.hoursOnDuty > 8 and environmentalCondition.riskScore > 5) [{
-            "alertType": "FATIGUE", // Changed 'type' to 'alertType'
+            alertType: "FATIGUE",
             severity: "CRITICAL",
             message: "Long hours + poor conditions",
             action: "MANDATORY_REST"

@@ -7,7 +7,7 @@
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
-    <flow name="get:\fleet-monitoring:chainsync-platform-api-config">
+    <flow name="get:\fleet-monitoring:chainsync-platform-api-config" doc:id="8eb51e27-e775-4b35-8f4f-29deaeac4965">
         <ee:transform doc:name="Transform Message - Fleet Monitoring Data">
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
