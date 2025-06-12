@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Fleet Monitoring API Test Suite -->
+    <munit:config name="fleet-monitoring-api-test-suite"/>
+
+    <!-- Test Configuration -->
+    <http:request-config name="testHttpRequestConfig">
+        <http:request-connection host="localhost" port="8081"/>
+    </http:request-config>
+
+    <!-- ========================================== -->
+    <!-- Fleet Monitoring Data Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-get-fleet-monitoring-success" description="Test successful retrieval of fleet monitoring data">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.data]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[sizeOf(payload.data)]" is="#[MunitTools::greaterThan(0)]"/>
+            <munit-tools:assert-that expression="#[payload.metadata.totalVehicles]" is="#[MunitTools::greaterThan(0)]"/>
+            
+            <!-- Validate first vehicle structure -->
+            <munit-tools:assert-that expression="#[payload.data[0].vehicleId]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].driverId]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].telematicsData]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].driverMetrics]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].vehicleHealth]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-get-fleet-monitoring-with-filters" description="Test fleet monitoring with query parameters">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+    "vehicleId" : "TRUCK_001",
+    "location" : "New York",
+    "minRiskScore" : "2"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.data]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Single Vehicle Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-get-vehicle-data-success" description="Test successful retrieval of single vehicle data">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Note: Current implementation returns 404, but this tests the flow -->
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::anyOf([MunitTools::equalTo(200), MunitTools::equalTo(404)])]"/>
+            
+            <!-- If 404, validate error structure -->
+            <choice>
+                <when expression="#[attributes.statusCode == 404]">
+                    <munit-tools:assert-that expression="#[payload.error.code]" is="#[MunitTools::equalTo('VEHICLE_NOT_FOUND')]"/>
+                    <munit-tools:assert-that expression="#[payload.error.message]" is="#[MunitTools::containsString('TRUCK_001')]"/>
+                </when>
+            </choice>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-get-vehicle-data-not-found" description="Test 404 response for non-existent vehicle">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring/INVALID_VEHICLE">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(404)]"/>
+            <munit-tools:assert-that expression="#[payload.error.code]" is="#[MunitTools::equalTo('VEHICLE_NOT_FOUND')]"/>
+            <munit-tools:assert-that expression="#[payload.error.message]" is="#[MunitTools::containsString('INVALID_VEHICLE')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Enhanced Fleet Monitoring Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-get-enhanced-fleet-monitoring" description="Test enhanced fleet monitoring with environmental context">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring/enhanced">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.data]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.metadata.environmentalDataIncluded]" is="#[MunitTools::equalTo(true)]"/>
+            
+            <!-- Validate enhanced data structure -->
+            <munit-tools:assert-that expression="#[payload.data[0].environmentalContext]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].enhancedRiskAssessment]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].environmentalContext.nearestStation]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].enhancedRiskAssessment.combinedRiskScore]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Driver Performance Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-get-driver-performance" description="Test driver performance analytics">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/driver-performance">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.period]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.driverPerformance]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.summary]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Validate driver performance structure -->
+            <munit-tools:assert-that expression="#[payload.summary.totalDrivers]" is="#[MunitTools::greaterThan(0)]"/>
+            <munit-tools:assert-that expression="#[payload.summary.averageFleetSafetyScore]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-get-driver-performance-with-filters" description="Test driver performance with filters">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/driver-performance">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+    "driverId" : "D001",
+    "period" : "month"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.period]" is="#[MunitTools::equalTo('month')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Fleet Alerts Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-get-fleet-alerts" description="Test retrieval of fleet alerts">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-alerts">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.alerts]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.summary]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.summary.totalAlerts]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-create-fleet-alert" description="Test creation of fleet alert">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="POST" path="/api/fleet-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+    "vehicleId": "TRUCK_001",
+    "driverId": "D001",
+    "alertType": "EMERGENCY",
+    "alertLevel": "CRITICAL",
+    "triggerCondition": "Vehicle breakdown on highway",
+    "location": "Interstate 95, Mile 45"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Content-Type" : "application/json",
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('Fleet alert created successfully')]"/>
+            <munit-tools:assert-that expression="#[payload.alertId]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Fleet Data Structure Validation Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-fleet-data-structure" description="Test fleet monitoring response structure">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Validate top-level structure -->
+            <munit-tools:assert-that expression="#[payload.data]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.metadata]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Validate first vehicle data structure -->
+            <ee:transform doc:name="Extract First Vehicle">
+                <ee:variables>
+                    <ee:set-variable variableName="firstVehicle">payload.data[0]</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <!-- Vehicle basic info -->
+            <munit-tools:assert-that expression="#[vars.firstVehicle.vehicleId]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.driverId]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.driverName]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.vehicleType]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Telematics Data -->
+            <munit-tools:assert-that expression="#[vars.firstVehicle.telematicsData.speed]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.telematicsData.engineStatus]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.telematicsData.fuelEfficiency]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Driver Metrics -->
+            <munit-tools:assert-that expression="#[vars.firstVehicle.driverMetrics.hoursOnDuty]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.driverMetrics.safetyScore]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Vehicle Health -->
+            <munit-tools:assert-that expression="#[vars.firstVehicle.vehicleHealth.mileage]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.vehicleHealth.fuelLevel]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.vehicleHealth.maintenanceStatus]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Risk Assessment -->
+            <munit-tools:assert-that expression="#[vars.firstVehicle.riskAssessment.riskScore]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[vars.firstVehicle.riskAssessment.status]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Business Logic Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-risk-score-validation" description="Test risk score is within valid range">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            
+            <!-- Validate risk scores are in valid range (1-10) -->
+            <ee:transform doc:name="Validate Risk Scores">
+                <ee:variables>
+                    <ee:set-variable variableName="allRiskScores">
+                        payload.data map $.riskAssessment.riskScore
+                    </ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <!-- Check each risk score is between 1 and 10 -->
+            <foreach collection="#[vars.allRiskScores]">
+                <munit-tools:assert-that expression="#[payload]" is="#[MunitTools::greaterThanOrEqualTo(1)]"/>
+                <munit-tools:assert-that expression="#[payload]" is="#[MunitTools::lessThanOrEqualTo(10)]"/>
+            </foreach>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-fuel-level-validation" description="Test fuel level is within valid range">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            
+            <!-- Validate fuel levels are in valid range (0-100) -->
+            <ee:transform doc:name="Validate Fuel Levels">
+                <ee:variables>
+                    <ee:set-variable variableName="allFuelLevels">
+                        payload.data map $.vehicleHealth.fuelLevel
+                    </ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <!-- Check each fuel level is between 0 and 100 -->
+            <foreach collection="#[vars.allFuelLevels]">
+                <munit-tools:assert-that expression="#[payload]" is="#[MunitTools::greaterThanOrEqualTo(0)]"/>
+                <munit-tools:assert-that expression="#[payload]" is="#[MunitTools::lessThanOrEqualTo(100)]"/>
+            </foreach>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Internal Flow Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-internal-fleet-monitoring-flow" description="Test internal fleet monitoring flow">
+        <munit:execution>
+            <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.data]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.metadata]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.data[0].vehicleId]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+</mule>

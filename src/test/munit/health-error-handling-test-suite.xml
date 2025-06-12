@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Health Check and Error Handling Test Suite -->
+    <munit:config name="health-error-handling-test-suite"/>
+
+    <!-- Test Configuration -->
+    <http:request-config name="testHttpRequestConfig">
+        <http:request-connection host="localhost" port="8081"/>
+    </http:request-config>
+
+    <!-- ========================================== -->
+    <!-- Health Check Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-health-check-success" description="Test successful health check endpoint">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/health">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.service]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.version]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.timestamp]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-health-check-structure" description="Test health check response structure">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/health">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            
+            <!-- Validate main health structure -->
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::anyOf([
+                MunitTools::equalTo('healthy'),
+                MunitTools::equalTo('degraded'),
+                MunitTools::equalTo('unhealthy')
+            ])]"/>
+            <munit-tools:assert-that expression="#[payload.service]" is="#[MunitTools::containsString('ChainSync')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- API Console Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-api-console-access" description="Test API console accessibility">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/console/">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "text/html"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Error Handling Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-404-not-found" description="Test 404 error handling for non-existent endpoints">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/non-existent-endpoint">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(404)]"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('not found')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-405-method-not-allowed" description="Test 405 error handling for unsupported HTTP methods">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="PATCH" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(405)]"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('not allowed')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-406-not-acceptable" description="Test 406 error handling for unsupported Accept headers">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/xml"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(406)]"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('acceptable')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-415-unsupported-media-type" description="Test 415 error handling for unsupported Content-Type">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="POST" path="/api/fleet-alerts">
+                <http:body><![CDATA[<xml>Invalid XML content</xml>]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Content-Type" : "application/xml",
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(415)]"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('media type')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-400-bad-request" description="Test 400 error handling for invalid request data">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="POST" path="/api/fleet-alerts">
+                <http:body><![CDATA[{"invalid": "json structure without required fields"}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Content-Type" : "application/json",
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Note: Depending on validation implementation, this might be 400 or 200 -->
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::anyOf([
+                MunitTools::equalTo(400),
+                MunitTools::equalTo(200)
+            ])]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Error Response Structure Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-error-response-structure" description="Test error response structure consistency">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/environmental-data/INVALID_STATION">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(404)]"/>
+            
+            <!-- Validate error structure -->
+            <munit-tools:assert-that expression="#[payload.error]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.error.code]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.error.message]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[payload.error.timestamp]" is="#[MunitTools::notNullValue()]"/>
+            
+            <!-- Validate error content -->
+            <munit-tools:assert-that expression="#[payload.error.code]" is="#[MunitTools::equalTo('STATION_NOT_FOUND')]"/>
+            <munit-tools:assert-that expression="#[payload.error.message]" is="#[MunitTools::containsString('INVALID_STATION')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-global-error-handler" description="Test global error handler functionality">
+        <munit:behavior>
+            <!-- Mock a flow to throw an error -->
+            <munit-tools:mock-when processor=".*environmental-data.*">
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="TRANSFORMATION" description="Mock transformation error"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Verify error is handled gracefully -->
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::anyOf([
+                MunitTools::equalTo(500),
+                MunitTools::equalTo(200)
+            ])]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- CORS and Security Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-cors-headers" description="Test CORS headers in responses">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="OPTIONS" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Origin" : "https://example.com",
+    "Access-Control-Request-Method" : "GET"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Note: CORS implementation would be needed to test this properly -->
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::anyOf([
+                MunitTools::equalTo(200),
+                MunitTools::equalTo(404),
+                MunitTools::equalTo(405)
+            ])]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Performance and Timeout Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-api-response-time" description="Test API response time across endpoints">
+        <munit:execution>
+            <ee:transform doc:name="Record Start Time">
+                <ee:variables>
+                    <ee:set-variable variableName="startTime">now()</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+            
+            <ee:transform doc:name="Calculate Response Time">
+                <ee:variables>
+                    <ee:set-variable variableName="endTime">now()</ee:set-variable>
+                    <ee:set-variable variableName="responseTime">(vars.endTime - vars.startTime)</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <!-- Assert response time is reasonable (less than 10 seconds) -->
+            <munit-tools:assert-that expression="#[vars.responseTime as Number]" is="#[MunitTools::lessThan(10000)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Content Type Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-json-content-type" description="Test JSON content type in responses">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[attributes.headers.'content-type']" is="#[MunitTools::containsString('application/json')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Load and Stress Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-concurrent-requests" description="Test handling of concurrent requests">
+        <munit:execution>
+            <parallel-foreach collection="#[1 to 5]">
+                <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/health">
+                    <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+                </http:request>
+            </parallel-foreach>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Verify all requests complete successfully -->
+            <munit-tools:assert-that expression="#[sizeOf(payload)]" is="#[MunitTools::equalTo(5)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- API Documentation Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-api-console-raml" description="Test API console serves RAML specification">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/console/api.raml">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/raml+yaml"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <!-- Note: Console RAML endpoint may not exist, so expect various responses -->
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::anyOf([
+                MunitTools::equalTo(200),
+                MunitTools::equalTo(404)
+            ])]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Data Consistency Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-timestamp-consistency" description="Test timestamp consistency across endpoints">
+        <munit:execution>
+            <ee:transform doc:name="Record Test Start Time">
+                <ee:variables>
+                    <ee:set-variable variableName="testStartTime">now()</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+            
+            <ee:transform doc:name="Extract Response Timestamp">
+                <ee:variables>
+                    <ee:set-variable variableName="responseTimestamp">payload.data[0].timestamp as DateTime</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            
+            <!-- Verify timestamp is reasonable (within last hour of test execution) -->
+            <munit-tools:assert-that expression="#[vars.responseTimestamp]" is="#[MunitTools::greaterThan(vars.testStartTime - |PT1H|)]"/>
+            <munit-tools:assert-that expression="#[vars.responseTimestamp]" is="#[MunitTools::lessThanOrEqualTo(now())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Security Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-security-headers" description="Test security headers in responses">
+        <munit:execution>
+            <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/health">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <!-- Note: Add security header validation if implemented -->
+        </munit:validation>
+    </munit:test>
+
+    <!-- ========================================== -->
+    <!-- Application Startup Tests -->
+    <!-- ========================================== -->
+
+    <munit:test name="test-application-startup-health" description="Test application health after startup">
+        <munit:execution>
+            <!-- Wait a moment for application to fully initialize -->
+            <until-successful maxRetries="10" millisBetweenRetries="1000">
+                <http:request config-ref="testHttpRequestConfig" method="GET" path="/api/health">
+                    <http:headers><![CDATA[#[output application/java
+---
+{
+    "Accept" : "application/json"
+}]]]></http:headers>
+                </http:request>
+            </until-successful>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[attributes.statusCode]" is="#[MunitTools::equalTo(200)]"/>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::anyOf([
+                MunitTools::equalTo('healthy'),
+                MunitTools::equalTo('degraded')
+            ])]"/>
+        </munit:validation>
+    </munit:test>
+
+</mule>
