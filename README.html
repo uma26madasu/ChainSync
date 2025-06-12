@@ -115,10 +115,86 @@ h3 {
     background: linear-gradient(135deg, #d2b4de, #e8daef);
     color: #2c3e50;
 }
+/* Updated Architecture Diagram Styling */
 .architecture-diagram {
-    background: linear-gradient(135deg, #f5b7b1, #f1948a);
-    color: #2c3e50;
+    background: linear-gradient(135deg, #f0f4f8, #e8edf3); /* Light, subtle background */
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    gap: 30px; /* Space between diagram components */
+    position: relative;
+    margin-bottom: 30px;
 }
+
+.arch-component {
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    text-align: center;
+    width: 280px; /* Fixed width for components */
+    min-height: 180px; /* Ensure consistent height */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.arch-component:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+}
+.arch-component h3 {
+    color: #34495e;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.4em;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+.arch-component ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+}
+.arch-component ul li {
+    padding: 5px 0;
+    color: #555;
+    font-size: 0.95em;
+}
+.arch-component ul li:before {
+    content: "• ";
+    color: #5dade2; /* Matching accent color */
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.arrow {
+    font-size: 2em; /* Size of the arrows */
+    color: #5dade2; /* Color of the arrows */
+    margin: 0 10px;
+    line-height: 1; /* Align vertically */
+}
+
+/* For connecting arrows, especially on larger screens */
+@media (min-width: 768px) {
+    .architecture-diagram {
+        flex-wrap: nowrap; /* Prevent wrapping on larger screens to keep arrows in line */
+    }
+    .arch-component:first-child + .arrow {
+        content: "➡️"; /* Right arrow */
+    }
+    .arch-component:nth-child(3) + .arrow {
+        content: "➡️"; /* Right arrow */
+    }
+}
+
+
 .prerequisites {
     background: #fdfefe;
     border-left: 5px solid #5dade2;
@@ -219,14 +295,37 @@ h3 {
 
         <h2>🏗️ Architecture</h2>
         <div class="architecture-diagram">
-            ┌─────────────────┐&nbsp;&nbsp;&nbsp;&nbsp;┌──────────────────┐&nbsp;&nbsp;&nbsp;&nbsp;┌─────────────────┐<br>
-            │&nbsp;&nbsp;&nbsp;External APIs&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;MuleSoft API&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;Coordination&nbsp;&nbsp;&nbsp;│<br>
-            │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
-            │&nbsp;•&nbsp;OpenWeatherMap│◄──►│&nbsp;•&nbsp;Data&nbsp;Transform&nbsp;│◄──►│&nbsp;•&nbsp;Slotify&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
-            │&nbsp;•&nbsp;OpenAQ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;•&nbsp;Risk&nbsp;Assessment│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;•&nbsp;Emergency&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
-            │&nbsp;•&nbsp;Fleet&nbsp;Systems&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;•&nbsp;Alert&nbsp;Engine&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;•&nbsp;Scheduling&nbsp;&nbsp;&nbsp;&nbsp;│<br>
-            └─────────────────┘&nbsp;&nbsp;&nbsp;&nbsp;└──────────────────┘&nbsp;&nbsp;&nbsp;&nbsp;└─────────────────┘
+            <div class="arch-component">
+                <h3>External APIs</h3>
+                <ul>
+                    <li><span role="img" aria-label="Cloud">☁️</span> OpenWeatherMap</li>
+                    <li><span role="img" aria-label="Wind">🌬️</span> OpenAQ</li>
+                    <li><span role="img" aria-label="Truck">🚚</span> Fleet Systems</li>
+                    <li><span role="img" aria-label="Database">🗄️</span> Historical Data</li>
+                </ul>
+            </div>
+            <span class="arrow" role="img" aria-label="Right Arrow">➡️</span>
+            <div class="arch-component">
+                <h3>MuleSoft API</h3>
+                <ul>
+                    <li><span role="img" aria-label="Transform">🔄</span> Data Transform</li>
+                    <li><span role="img" aria-label="Chart">📊</span> Risk Assessment</li>
+                    <li><span role="img" aria-label="Bell">🔔</span> Alert Engine</li>
+                    <li><span role="img" aria-label="Security">🔒</span> Security Layer</li>
+                </ul>
+            </div>
+            <span class="arrow" role="img" aria-label="Right Arrow">➡️</span>
+            <div class="arch-component">
+                <h3>Coordination</h3>
+                <ul>
+                    <li><span role="img" aria-label="Calendar">🗓️</span> Slotify</li>
+                    <li><span role="img" aria-label="Ambulance">🚑</span> Emergency Response</li>
+                    <li><span role="img" aria-label="Clock">⏰</span> Scheduling</li>
+                    <li><span role="img" aria-label="Chat">💬</span> Multi-stakeholder Comms</li>
+                </ul>
+            </div>
         </div>
+
 
         <h2>🚀 Quick Start</h2>
         
