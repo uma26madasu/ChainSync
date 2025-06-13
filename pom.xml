@@ -1,247 +1,104 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.mycompany</groupId>
-	<artifactId>chainsync_platform_api</artifactId>
+	<groupId>com.maritime.sustainability</groupId>
+	<artifactId>chainsync-platform-api</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>mule-application</packaging>
 
-	<name>chainsync_platform_api</name>
+	<name>ChainSync Platform API</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-
 		<app.runtime>4.4.0</app.runtime>
 		<mule.maven.plugin.version>4.3.0</mule.maven.plugin.version>
-		<mule.http.connector.version>1.7.1</mule.http.connector.version>
-		<mule.apikit.module.version>1.9.1</mule.apikit.module.version>
-		
-		<!-- MUnit Testing Properties -->
-		<munit.version>3.0.0</munit.version>
-		<munit.extensions.maven.plugin.version>1.1.2</munit.extensions.maven.plugin.version>
-		<munit.coverage.report.format>html</munit.coverage.report.format>
-		<munit.test.timeout>300000</munit.test.timeout>
-		
-		<!-- Testing Coverage Properties -->
-		<coverage.minimum.application>70</coverage.minimum.application>
-		<coverage.minimum.resource>60</coverage.minimum.resource>
-		<coverage.minimum.flow>65</coverage.minimum.flow>
 	</properties>
 
 	<build>
 		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-clean-plugin</artifactId>
-				<version>3.0.0</version>
-			</plugin>
-			
 			<plugin>
 				<groupId>org.mule.tools.maven</groupId>
 				<artifactId>mule-maven-plugin</artifactId>
 				<version>${mule.maven.plugin.version}</version>
 				<extensions>true</extensions>
 				<configuration>
-					<sharedLibraries>
-						<sharedLibrary>
-							<groupId>org.apache.derby</groupId>
-							<artifactId>derby</artifactId>
-						</sharedLibrary>
-					</sharedLibraries>
-				</configuration>
-			</plugin>
-			
-			<!-- MUnit Maven Plugin -->
-			<plugin>
-				<groupId>com.mulesoft.munit.tools</groupId>
-				<artifactId>munit-maven-plugin</artifactId>
-				<version>${munit.version}</version>
-				<executions>
-					<execution>
-						<id>test</id>
-						<phase>test</phase>
-						<goals>
-							<goal>test</goal>
-							<goal>coverage-report</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<runtimeVersion>${app.runtime}</runtimeVersion>
-					<systemPropertyVariables>
-						<mule.env>test</mule.env>
-						<mule.testTimeouts>${munit.test.timeout}</mule.testTimeouts>
-					</systemPropertyVariables>
-					<coverage>
-						<runCoverage>true</runCoverage>
-						<failBuild>false</failBuild>
-						<requiredApplicationCoverage>${coverage.minimum.application}</requiredApplicationCoverage>
-						<requiredResourceCoverage>${coverage.minimum.resource}</requiredResourceCoverage>
-						<requiredFlowCoverage>${coverage.minimum.flow}</requiredFlowCoverage>
-						<formats>
-							<format>html</format>
-							<format>json</format>
-						</formats>
-					</coverage>
-					<environmentVariables>
-						<env>test</env>
-						<http.host>localhost</http.host>
-						<http.port>8081</http.port>
-					</environmentVariables>
-				</configuration>
+                    <classifier>mule-application</classifier>
+                </configuration>
 			</plugin>
 		</plugins>
 	</build>
 
 	<dependencies>
-		<!-- Mule Runtime Dependencies -->
 		<dependency>
 			<groupId>org.mule.connectors</groupId>
 			<artifactId>mule-http-connector</artifactId>
-			<version>${mule.http.connector.version}</version>
+			<version>1.7.3</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
-		
+		<dependency>
+			<groupId>org.mule.connectors</groupId>
+			<artifactId>mule-db-connector</artifactId>
+			<version>1.14.0</version>
+			<classifier>mule-plugin</classifier>
+		</dependency>
 		<dependency>
 			<groupId>org.mule.modules</groupId>
 			<artifactId>mule-apikit-module</artifactId>
-			<version>${mule.apikit.module.version}</version>
+			<version>1.4.1</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
-		
-		<!-- MUnit Testing Dependencies -->
 		<dependency>
-			<groupId>com.mulesoft.munit</groupId>
-			<artifactId>munit-runner</artifactId>
-			<version>${munit.version}</version>
-			<classifier>mule-plugin</classifier>
-			<scope>test</scope>
-		</dependency>
-		
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>42.7.3</version> </dependency>
+
 		<dependency>
-			<groupId>com.mulesoft.munit</groupId>
-			<artifactId>munit-tools</artifactId>
-			<version>${munit.version}</version>
-			<classifier>mule-plugin</classifier>
-			<scope>test</scope>
+			<groupId>org.mule.runtime</groupId>
+			<artifactId>mule-core</artifactId>
+			<version>${app.runtime}</version>
+			<scope>provided</scope>
 		</dependency>
-		
 		<dependency>
-			<groupId>org.mule.weave</groupId>
-			<artifactId>assertions</artifactId>
-			<version>1.0.2</version>
-			<scope>test</scope>
+			<groupId>org.mule.runtime</groupId>
+			<artifactId>mule-module-configs</artifactId>
+			<version>${app.runtime}</version>
+			<scope>provided</scope>
 		</dependency>
-		
-		<!-- MUnit Extensions -->
 		<dependency>
-			<groupId>com.mulesoft.munit.utils</groupId>
-			<artifactId>munit-dbserver-module</artifactId>
-			<version>2.0.1</version>
-			<classifier>mule-plugin</classifier>
-			<scope>test</scope>
+			<groupId>org.mule.runtime</groupId>
+			<artifactId>mule-service-http-api</artifactId>
+			<version>${app.runtime}</version>
+			<scope>provided</scope>
 		</dependency>
-		
-		<dependency>
-			<groupId>com.mulesoft.munit.utils</groupId>
-			<artifactId>munit-ftpserver-module</artifactId>
-			<version>2.0.1</version>
-			<classifier>mule-plugin</classifier>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
+		</dependencies>
 
 	<repositories>
 		<repository>
-			<id>anypoint-exchange</id>
+			<id>anypoint-exchange-v3</id>
 			<name>Anypoint Exchange</name>
 			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
 			<layout>default</layout>
 		</repository>
 		<repository>
 			<id>mulesoft-releases</id>
-			<name>MuleSoft Releases</name>
+			<name>MuleSoft Releases Repository</name>
 			<url>https://repository.mulesoft.org/releases/</url>
 			<layout>default</layout>
 		</repository>
-		<repository>
-			<id>anypoint-exchange-v3</id>
-			<name>Anypoint Exchange V3</name>
-			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
-			<layout>default</layout>
-		</repository>
+		
 	</repositories>
 
 	<pluginRepositories>
 		<pluginRepository>
 			<id>mulesoft-releases</id>
-			<name>MuleSoft Releases</name>
-			<url>https://repository.mulesoft.org/releases/</url>
+			<name>MuleSoft Releases Repository</name>
 			<layout>default</layout>
+			<url>https://repository.mulesoft.org/releases/</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
 		</pluginRepository>
 	</pluginRepositories>
-
-	<profiles>
-		<!-- Testing Profile -->
-		<profile>
-			<id>test</id>
-			<properties>
-				<mule.env>test</mule.env>
-			</properties>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>com.mulesoft.munit.tools</groupId>
-						<artifactId>munit-maven-plugin</artifactId>
-						<version>${munit.version}</version>
-						<executions>
-							<execution>
-								<id>test</id>
-								<phase>test</phase>
-								<goals>
-									<goal>test</goal>
-									<goal>coverage-report</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		
-		<!-- Coverage Profile -->
-		<profile>
-			<id>coverage</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>com.mulesoft.munit.tools</groupId>
-						<artifactId>munit-maven-plugin</artifactId>
-						<version>${munit.version}</version>
-						<executions>
-							<execution>
-								<id>coverage</id>
-								<phase>test</phase>
-								<goals>
-									<goal>coverage-report</goal>
-								</goals>
-							</execution>
-						</executions>
-						<configuration>
-							<coverage>
-								<runCoverage>true</runCoverage>
-								<failBuild>true</failBuild>
-								<requiredApplicationCoverage>80</requiredApplicationCoverage>
-								<requiredResourceCoverage>70</requiredResourceCoverage>
-								<requiredFlowCoverage>75</requiredFlowCoverage>
-							</coverage>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
 
 </project>

@@ -1,6 +1,43 @@
 {
-  "minMuleVersion": "4.4.0",
-  "javaSpecificationVersions": [
-    "1.8"
-  ]
+    "configs": [
+        "chainsync-platform-api.xml",
+        "global.xml",
+        "environmental-data-integration.xml",
+        "environmental-data-system-api.xml",
+        "error-handling.xml",
+        "external-api-config.xml",
+        "fleet-environmental-coordination.xml",
+        "fleet-monitoring-api.xml"
+    ],
+    "redeploymentEnabled": true,
+    "classLoaderModelLoaderDescriptor": {
+        "attributes": {
+            "includeTestDependencies": "false",
+            "exportedPackages": [],
+            "exportedResources": [
+                "api/chainsync-platform-api.raml",
+                "api/examples/environmental-data-example.json"
+            ]
+        },
+        "id": "mule"
+    },
+    "name": "chainsync-platform-api",
+    "requiredProduct": "MULE_EE",
+    "minMuleVersion": "4.4.0",
+    "bundleDescriptorLoader": {
+        "attributes": {},
+        "id": "mule"
+    },
+    "javaSpecificationVersions": ["1.8"],
+    "secureProperties": [
+        "db.password",
+        "api.password",
+        "tls.truststore.password",
+        "tls.keystore.password",
+        "tls.key.password",
+        "weather.api.key",
+        "regulatory.api.token",
+        "ais.api.key",
+        "blockchain.private.key"
+    ]
 }

@@ -303,7 +303,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Team
 
-- **Lead Developer**: [Your Name]
+- **Developer**: Uma Madasu
 - **Architecture**: MuleSoft Integration Platform
 - **Project Type**: Environmental Monitoring & Fleet Coordination
 
