@@ -11,8 +11,8 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<app.runtime>4.4.0</app.runtime>
-		<mule.maven.plugin.version>4.3.0</mule.maven.plugin.version>
+		<app.runtime>4.7.4</app.runtime>
+		<mule.maven.plugin.version>4.5.0</mule.maven.plugin.version>
 	</properties>
 
 	<build>
@@ -24,12 +24,24 @@
 				<extensions>true</extensions>
 				<configuration>
                     <classifier>mule-application</classifier>
+                    <sharedLibraries>
+                        <sharedLibrary>
+                            <groupId>org.mule.runtime</groupId>
+                            <artifactId>mule-module-global-config</artifactId>
+                        </sharedLibrary>
+                    </sharedLibraries>
                 </configuration>
 			</plugin>
 		</plugins>
 	</build>
 
 	<dependencies>
+		<dependency>
+			<groupId>org.mule.connectors</groupId>
+			<artifactId>mule-sockets-connector</artifactId>
+			<version>1.2.2</version>
+			<classifier>mule-plugin</classifier>
+		</dependency>
 		<dependency>
 			<groupId>org.mule.connectors</groupId>
 			<artifactId>mule-http-connector</artifactId>
@@ -49,29 +61,18 @@
 			<classifier>mule-plugin</classifier>
 		</dependency>
 		<dependency>
+			<groupId>org.mule.runtime</groupId>
+			<artifactId>mule-module-global-config</artifactId>
+			<version>${app.runtime}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>42.7.3</version> </dependency>
+			<version>42.7.3</version>
+		</dependency>
 
-		<dependency>
-			<groupId>org.mule.runtime</groupId>
-			<artifactId>mule-core</artifactId>
-			<version>${app.runtime}</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.mule.runtime</groupId>
-			<artifactId>mule-module-configs</artifactId>
-			<version>${app.runtime}</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.mule.runtime</groupId>
-			<artifactId>mule-service-http-api</artifactId>
-			<version>${app.runtime}</version>
-			<scope>provided</scope>
-		</dependency>
-		</dependencies>
+    </dependencies>
 
 	<repositories>
 		<repository>
@@ -86,18 +87,20 @@
 			<url>https://repository.mulesoft.org/releases/</url>
 			<layout>default</layout>
 		</repository>
-		
+		<repository>
+			<id>mulesoft-public</id>
+			<name>MuleSoft Public Repository</name>
+			<url>https://repository.mulesoft.org/public/</url>
+			<layout>default</layout>
+		</repository>
 	</repositories>
 
 	<pluginRepositories>
 		<pluginRepository>
 			<id>mulesoft-releases</id>
 			<name>MuleSoft Releases Repository</name>
-			<layout>default</layout>
 			<url>https://repository.mulesoft.org/releases/</url>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
+			<layout>default</layout>
 		</pluginRepository>
 	</pluginRepositories>
 
