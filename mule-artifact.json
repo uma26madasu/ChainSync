@@ -1,13 +1,14 @@
 {
     "configs": [
         "chainsync-platform-api.xml",
-        "global.xml",
+        "environmental-data-impl.xml",
         "environmental-data-integration.xml",
         "environmental-data-system-api.xml",
         "error-handling.xml",
         "external-api-config.xml",
         "fleet-environmental-coordination.xml",
-        "fleet-monitoring-api.xml"
+        "fleet-monitoring-api.xml",
+        "global.xml"
     ],
     "redeploymentEnabled": true,
     "classLoaderModelLoaderDescriptor": {
@@ -28,7 +29,7 @@
         "attributes": {},
         "id": "mule"
     },
-    "javaSpecificationVersions": ["1.8"],
+    "javaSpecificationVersions": ["17"],
     "secureProperties": [
         "db.password",
         "api.password",
