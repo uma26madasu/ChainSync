@@ -1,0 +1,47 @@
+#%RAML 1.0 Library
+
+types:
+
+  EnvironmentalFacilityData:
+    type: object
+    description: Real-time environmental metrics for a facility
+    properties:
+      facilityId: string
+      name: string
+      location: string
+      region: string
+      coordinates:
+        type: object
+        properties:
+          latitude: number
+          longitude: number
+      metrics:
+        type: object
+        properties:
+          waterQualityScore: number
+          airQualityScore: number
+          contaminationFlag: boolean
+      timestamp: datetime
+      isRealTime: boolean
+
+  FacilityIncidentReport:
+    type: object
+    description: Contamination, safety, or mechanical incident tied to an environmental facility
+    properties:
+      incidentId: string
+      facilityId: string
+      incidentType:
+        type: string
+        enum: ["CONTAMINATION_BREACH", "EQUIPMENT_FAILURE", "SAFETY_VIOLATION", "SECURITY_EVENT", "REGULATORY_ALERT"]
+      severity:
+        type: string
+        enum: ["LOW", "MODERATE", "HIGH", "CRITICAL"]
+      description: string
+      reportedBy: string
+      timestamp: datetime
+      containmentActions: string[]
+      status:
+        type: string
+        enum: ["OPEN", "UNDER_INVESTIGATION", "RESOLVED", "ESCALATED"]
+      reviewStatus?: string
+      assignedTeam?: string

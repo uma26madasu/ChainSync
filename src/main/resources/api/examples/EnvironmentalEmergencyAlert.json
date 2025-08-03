@@ -1,0 +1,84 @@
+[
+  {
+    "alertId": "ENV_ALERT_NYC_20250609_001",
+    "facilityId": "VEOLIA_WTP_NYC_001",
+    "facilityName": "Veolia NYC Water Treatment Plant",
+    "emergencyType": "WATER_QUALITY_EXCEEDANCE",
+    "alertLevel": "CRITICAL",
+    "environmentalRiskScore": 9,
+    "affectedPopulation": 125000,
+    "triggerCondition": "E. coli detected in treated water exceeding EPA standards",
+    "publicHealthImpact": {
+      "healthRisk": "HIGH",
+      "vulnerablePopulations": [
+        "Children under 5",
+        "Elderly residents",
+        "Immunocompromised individuals"
+      ],
+      "recommendedActions": [
+        "Boil water before consumption",
+        "Avoid outdoor activities",
+        "Seek medical attention if symptoms occur"
+      ]
+    },
+    "regulatoryCoordination": {
+      "agenciesNotified": [
+        "EPA Region 2",
+        "State Health Department",
+        "Local Emergency Management"
+      ],
+      "reportingRequirements": [
+        {
+          "agency": "EPA",
+          "requirement": "Immediate notification within 1 hour",
+          "deadline": "2025-06-09T21:00:00Z",
+          "status": "SUBMITTED"
+        }
+      ]
+    },
+    "emergencyCoordinationWorkflow": {
+      "workflowId": "ENV_WF_20250609_001",
+      "multiAgencyMeetingScheduled": true,
+      "estimatedMeetingTime": "2025-06-09T20:30:00Z",
+      "coordinatingAgencies": [
+        "EPA Regional Response Team",
+        "State Environmental Department",
+        "Public Health Department",
+        "Local Emergency Management",
+        "Fire Department HAZMAT"
+      ],
+      "emergencyActionItems": [
+        "Issue public health advisory",
+        "Activate backup water supply",
+        "Coordinate media response",
+        "Deploy emergency water distribution"
+      ],
+      "slotifyIntegration": {
+        "schedulingEnabled": true,
+        "meetingRoom": "Ops Center A",
+        "videoConference": "https://slotify.io/env-meet",
+        "participantNotifications": true
+      }
+    },
+    "publicNotification": {
+      "publicAlertIssued": true,
+      "notificationChannels": [
+        "Emergency Alert System",
+        "Local Media",
+        "Social Media",
+        "Direct Customer Notification",
+        "Municipal Website"
+      ],
+      "affectedAreas": [
+        "Downtown District",
+        "Residential Zone A",
+        "School District 15"
+      ],
+      "communityResources": [
+        "Emergency water distribution at Community Center",
+        "Alternative water sources at Fire Stations"
+      ]
+    },
+    "timestamp": "2025-06-09T20:00:00Z"
+  }
+]

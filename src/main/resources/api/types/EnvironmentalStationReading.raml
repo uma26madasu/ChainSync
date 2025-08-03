@@ -1,0 +1,24 @@
+#%RAML 1.0 Library
+
+types:
+
+  EnvironmentalStationReading:
+    type: object
+    displayName: Environmental Station Reading
+    description: Manually submitted or overridden environmental data from a station sensor
+    properties:
+      stationId: string
+      sensorType:
+        type: string
+        enum: ["WATER_QUALITY", "AIR_MONITORING", "SOIL_ANALYSIS", "RADIOACTIVE_MATERIAL", "NOISE_MONITORING"]
+      data:
+        type: object
+        description: Key-value sensor metrics captured during the reading
+      readingTimestamp: datetime
+      submittedBy: string
+      notes?: string
+      processingStatus?:
+        type: string
+        enum: ["ACCEPTED", "REJECTED", "QUEUED", "IGNORED"]
+      ingestedAt?: datetime
+      message?: string

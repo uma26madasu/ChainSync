@@ -1,0 +1,9 @@
+{
+  "alertId": "ALERT_20250710_001",
+  "facilityId": "VEOLIA_WTP_001",
+  "emergencyType": "WATER_QUALITY_EXCEEDANCE",
+  "alertLevel": "CRITICAL",
+  "triggerCondition": "E. coli detected in treated water",
+  "affectedPopulation": 125000,
+  "timestamp": "2025-07-10T14:30:00Z"
+}

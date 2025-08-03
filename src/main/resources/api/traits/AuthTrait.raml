@@ -1,0 +1,10 @@
+#%RAML 1.0 Trait
+
+usage: Secures endpoints with OAuth 2.0 access token
+
+headers:
+  Authorization:
+    type: string
+    required: true
+    description: OAuth 2.0 access token header
+    example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

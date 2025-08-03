@@ -1,0 +1,12 @@
+#%RAML 1.0 Trait
+    queryParameters:
+      vehicleType?:
+        type: string
+        enum: ["WATER_TANK_TRUCK", "WASTE_HAULER", "MOBILE_LAB", "SPILL_RESPONSE", "SERVICE_VEHICLE"]
+      serviceArea?:
+        type: string
+      availabilityStatus?:
+        type: string
+        enum: ["AVAILABLE", "RESPONDING", "MAINTENANCE", "OUT_OF_SERVICE"]
+      emergencyCapable?:
+        type: boolean

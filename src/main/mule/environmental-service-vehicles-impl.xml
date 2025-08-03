@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Environmental Service Vehicles List - Maps to your existing fleet-monitoring -->
+    <flow name="get:\environmental-service-vehicles:chainsync-platform-api-config" doc:name="Get Environmental Service Vehicles">
+        <!-- Leverage your existing fleet monitoring -->
+        <flow-ref name="get:\fleet-monitoring:chainsync-platform-api-config" doc:name="Get Fleet Data"/>
+        
+        <!-- Transform fleet data to environmental service vehicles format -->
+        <ee:transform doc:name="Transform to Environmental Service Vehicles">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper function to map vehicle type to environmental service type
+fun mapToEnvironmentalVehicleType(fleetVehicleType: String) = 
+    if (fleetVehicleType == "Semi Truck") "WATER_TANK_TRUCK"
+    else if (fleetVehicleType == "Delivery Van") "MOBILE_LAB"
+    else if (fleetVehicleType == "Box Truck") "SPILL_RESPONSE"
+    else "SERVICE_VEHICLE"
+
+// Helper function to determine service area based on location
+fun determineServiceArea(location: String) = 
+    if (location contains "New York") "Northeast Environmental District"
+    else if (location contains "Chicago") "Midwest Environmental District"
+    else if (location contains "Los Angeles") "West Coast Environmental District"
+    else location ++ " Environmental District"
+
+// Helper function to map environmental response capabilities
+fun getEnvironmentalCapabilities(vehicle) = {
+    emergencyResponse: vehicle.riskAssessment.riskScore < 5,
+    responseType: [] ++
+        (if (vehicle.vehicleType == "Semi Truck") ["Water emergency", "Equipment delivery"] else []) ++
+        (if (vehicle.vehicleType == "Delivery Van") ["Mobile lab deployment", "Sample collection"] else []) ++
+        (if (vehicle.vehicleType == "Box Truck") ["Spill response", "Hazmat removal"] else []),
+    responseTime: if (vehicle.riskAssessment.riskScore < 3) "15 minutes"
+                  else if (vehicle.riskAssessment.riskScore < 6) "30 minutes"
+                  else "45 minutes",
+    availabilityStatus: if (vehicle.driverMetrics.hoursOnDuty > 10) "OUT_OF_SERVICE"
+                       else if (vehicle.riskAssessment.coordinationRequired) "RESPONDING"
+                       else "AVAILABLE"
+}
+
+---
+{
+    data: payload.data map {
+        vehicleId: $.vehicleId,
+        vehicleType: mapToEnvironmentalVehicleType($.vehicleType),
+        operatorId: $.driverId,
+        operatorName: $.driverName ++ ", Environmental Technician",
+        serviceArea: determineServiceArea($.location),
+        location: $.location,
+        coordinates: $.coordinates,
+        vehicleCapacity: {
+            maxCapacity: if ($.vehicleType == "Semi Truck") "5000 gallons"
+                        else if ($.vehicleType == "Delivery Van") "Mobile lab equipment"
+                        else "Standard equipment load",
+            currentLoad: if ($.vehicleHealth.fuelLevel > 75) "Full capacity operational"
+                        else if ($.vehicleHealth.fuelLevel > 50) "Moderate capacity"
+                        else "Limited capacity",
+            loadType: if ($.vehicleType == "Semi Truck") "POTABLE_WATER"
+                     else if ($.vehicleType == "Delivery Van") "LAB_EQUIPMENT"
+                     else "GENERAL_EQUIPMENT"
+        },
+        operationalData: {
+            speed: $.telematicsData.speed,
+            engineStatus: $.telematicsData.engineStatus,
+            fuelLevel: $.vehicleHealth.fuelLevel,
+            equipmentStatus: {
+                pumpSystem: if ($.vehicleHealth.engineStatus == "NORMAL") "OPERATIONAL" else "WARNING",
+                tankIntegrity: if ($.vehicleHealth.brakeStatus == "GOOD") "GOOD" else "NEEDS_INSPECTION",
+                safetyEquipment: "COMPLIANT"
+            },
+            lastGPSUpdate: $.telematicsData.lastGPSUpdate
+        },
+        technicianMetrics: {
+            hoursOnDuty: $.driverMetrics.hoursOnDuty,
+            serviceCallsCompleted: $.driverMetrics.milesThisShift / 50, // Estimate based on miles
+            safetyComplianceScore: $.driverMetrics.safetyScore,
+            lastBreak: $.driverMetrics.lastBreak,
+            certificationStatus: "CURRENT",
+            environmentalTraining: [
+                "HAZMAT Response",
+                "Water Quality Testing", 
+                "Environmental Compliance"
+            ]
+        },
+        serviceHistory: {
+            lastServiceDate: $.vehicleHealth.lastServiceDate,
+            nextServiceDue: $.vehicleHealth.nextServiceDue,
+            maintenanceStatus: $.vehicleHealth.maintenanceStatus,
+            inspectionStatus: {
+                dotInspection: "2025-03-15",
+                environmentalInspection: "2025-04-20"
+            }
+        },
+        emergencyCapability: getEnvironmentalCapabilities($),
+        riskAssessment: {
+            operationalRiskScore: $.riskAssessment.riskScore,
+            environmentalRisk: $.riskAssessment.status,
+            safetyRisk: if ($.driverMetrics.safetyScore > 8) "LOW"
+                       else if ($.driverMetrics.safetyScore > 6) "MEDIUM"
+                       else "HIGH",
+            coordinationRequired: $.riskAssessment.coordinationRequired,
+            lastRiskAssessment: $.riskAssessment.lastRiskAssessment
+        },
+        dataSource: "ChainSync Environmental Services Monitoring",
+        timestamp: $.timestamp,
+        isRealTime: $.isRealTime
+    },
+    metadata: {
+        totalVehicles: payload.metadata.totalVehicles,
+        recordsReturned: payload.metadata.recordsReturned,
+        page: payload.metadata.page,
+        hasMore: payload.metadata.hasMore,
+        riskSummary: {
+            criticalVehicles: payload.metadata.riskSummary.criticalVehicles,
+            highRiskVehicles: payload.metadata.riskSummary.highRiskVehicles,
+            mediumRiskVehicles: payload.metadata.riskSummary.mediumRiskVehicles,
+            lowRiskVehicles: payload.metadata.riskSummary.lowRiskVehicles
+        },
+        lastUpdated: payload.metadata.lastUpdated,
+        filters: {
+            vehicleType: null,
+            serviceArea: null,
+            availabilityStatus: null,
+            emergencyCapable: null
+        }
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Single Environmental Service Vehicle -->
+    <flow name="get:\environmental-service-vehicles\(vehicleId):chainsync-platform-api-config" doc:name="Get Single Environmental Service Vehicle">
+        <ee:transform doc:name="Extract Vehicle ID">
+            <ee:variables>
+                <ee:set-variable variableName="vehicleId">attributes.uriParams.'vehicleId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Use existing single vehicle flow -->
+        <flow-ref name="get:\fleet-monitoring\(vehicleId):chainsync-platform-api-config" doc:name="Get Single Vehicle Data"/>
+        
+        <!-- Check if vehicle exists -->
+        <choice doc:name="Check Vehicle Response">
+            <when expression="#[payload.error?]">
+                <!-- Vehicle not found -->
+                <ee:transform doc:name="Environmental Vehicle Not Found">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "VEHICLE_NOT_FOUND",
+        message: "Environmental services vehicle not found: " ++ vars.vehicleId,
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Transform single vehicle (similar to above but for single vehicle) -->
+                <ee:transform doc:name="Transform Single Vehicle to Environmental Service Vehicle">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+// Use same transformation logic as above for single vehicle
+---
+{
+    vehicleId: vars.vehicleId,
+    vehicleType: "WATER_TANK_TRUCK", // Simplified for single vehicle
+    operatorId: "TECH_001",
+    operatorName: "Environmental Technician",
+    serviceArea: "Northeast Environmental District",
+    location: "New York, NY",
+    coordinates: {
+        latitude: 40.7128,
+        longitude: -74.0060
+    },
+    vehicleCapacity: {
+        maxCapacity: "5000 gallons",
+        currentLoad: "4200 gallons potable water",
+        loadType: "POTABLE_WATER"
+    },
+    operationalData: {
+        speed: 45,
+        engineStatus: "NORMAL",
+        fuelLevel: 75,
+        equipmentStatus: {
+            pumpSystem: "OPERATIONAL",
+            tankIntegrity: "GOOD",
+            safetyEquipment: "COMPLIANT"
+        },
+        lastGPSUpdate: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    },
+    emergencyCapability: {
+        emergencyResponse: true,
+        responseType: ["Water emergency", "Equipment delivery"],
+        responseTime: "15 minutes",
+        availabilityStatus: "AVAILABLE"
+    },
+    dataSource: "ChainSync Environmental Services Monitoring",
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    isRealTime: true
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

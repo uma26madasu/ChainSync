@@ -1,0 +1,24 @@
+#%RAML 1.0 Library
+types:
+  ErrorResponse:
+    type: object
+    description: Standard error response for failed API calls
+    properties:
+      error:
+        type: object
+        properties:
+          code:
+            type: string
+            description: Error code identifier
+            example: "FACILITY_NOT_FOUND"
+          message:
+            type: string
+            description: Human-readable error message
+            example: "Environmental facility was not found"
+          details?:
+            type: string
+            description: Optional detailed context about the error
+          timestamp:
+            type: datetime
+            description: Time the error occurred
+            example: "2025-07-09T20:00:00Z"

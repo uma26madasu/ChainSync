@@ -1,0 +1,61 @@
+{
+  "facilityId": "VEOLIA_WTP_NYC_001",
+  "facilityName": "Veolia NYC Water Treatment Plant",
+  "facilityType": "WATER_TREATMENT",
+  "operationalCapacity": "50 million gallons/day",
+  "location": "New York, NY",
+  "coordinates": {
+    "latitude": 40.7128,
+    "longitude": -74.0060
+  },
+  "environmentalParameters": {
+    "waterQuality": {
+      "turbidity": 0.15,
+      "ph": 7.2,
+      "chlorineResidual": 0.8,
+      "bacterialCount": {
+        "totalColiform": 0,
+        "eColi": 0
+      }
+    },
+    "airQuality": {
+      "emissions": {
+        "particulateMatter": 15.2,
+        "nox": 45.8,
+        "so2": 8.1,
+        "co": 12.5
+      }
+    }
+  },
+  "operationalStatus": {
+    "operationMode": "NORMAL",
+    "equipmentStatus": "OPTIMAL",
+    "processingEfficiency": 98.5,
+    "backupSystems": [
+      "Secondary Treatment Line",
+      "Emergency Generators"
+    ]
+  },
+  "complianceStatus": {
+    "epaCompliant": true,
+    "stateCompliant": true,
+    "localCompliant": true,
+    "lastViolation": "2024-11-05",
+    "nextInspection": "2025-07-15"
+  },
+  "riskAssessment": {
+    "environmentalRiskScore": 3,
+    "regulatoryRisk": "LOW",
+    "publicHealthRisk": "MINIMAL",
+    "emergencyCoordinationRequired": false,
+    "estimatedResponseTime": "Not required"
+  },
+  "emergencyContacts": {
+    "facilityManager": "John Smith, P.E.",
+    "environmentalCompliance": "Sarah Johnson",
+    "emergencyCoordinator": "Mike Wilson"
+  },
+  "dataSource": "ChainSync Environmental Monitoring",
+  "timestamp": "2025-07-09T20:00:00Z",
+  "isRealTime": true
+}

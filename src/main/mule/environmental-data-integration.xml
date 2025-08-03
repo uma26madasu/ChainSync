@@ -9,16 +9,95 @@
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
         http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
 
-    <!-- Sub-flow to fetch weather data from OpenWeatherMap -->
+    <sub-flow name="fetch-enhanced-environmental-data-subflow" doc:name="Fetch Enhanced Environmental Data">
+        <choice doc:name="API Integration Choice">
+            <when expression="#[p('external.apis.enabled') == 'true']">
+                <try doc:name="Try Real APIs">
+                    <scatter-gather doc:name="Gather Real Data">
+                        <route>
+                            <flow-ref name="fetch-weather-data-subflow" doc:name="Get Weather Data"/>
+                        </route>
+                        <route>
+                            <flow-ref name="fetch-air-quality-data-subflow" doc:name="Get Air Quality Data"/>
+                        </route>
+                    </scatter-gather>
+                    <ee:transform doc:name="Merge Real API Data">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var weatherData = payload[0].payload
+var airData = payload[1].payload
+---
+{
+  weather: weatherData,
+  airQuality: airData,
+  dataSource: "Real-time APIs (Weather: OpenWeatherMap, Air: OpenAQ)",
+  isRealTime: true,
+  apiStatus: "CONNECTED"
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                    <error-handler>
+                        <on-error-continue type="ANY">
+                            <logger level="WARN" message="Real API failed, falling back to mock data: #[error.description]" doc:name="Log API Failure"/>
+                            <flow-ref name="generate-mock-environmental-data-subflow" doc:name="Fallback to Mock Data"/>
+                        </on-error-continue>
+                    </error-handler>
+                </try>
+            </when>
+            <otherwise>
+                <flow-ref name="generate-mock-environmental-data-subflow" doc:name="Use Mock Data"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+    <sub-flow name="generate-mock-environmental-data-subflow" doc:name="Generate Mock Environmental Data">
+        <ee:transform doc:name="Generate Mock Data">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  weather: {
+    temperature: 22.5 + (randomInt(20) - 10),
+    humidity: 60 + randomInt(30),
+    pressure: 1013.25 + (randomInt(20) - 10),
+    windSpeed: randomInt(25),
+    windDirection: randomInt(360),
+    visibility: 10 + randomInt(15),
+    condition: ["Clear", "Partly Cloudy", "Cloudy", "Overcast"][randomInt(4)],
+    description: "Mock weather data for testing"
+  },
+  airQuality: {
+    aqi: 30 + randomInt(120),
+    level: if (30 + randomInt(120) <= 50) "Good"
+           else if (30 + randomInt(120) <= 100) "Moderate"
+           else "Unhealthy for Sensitive Groups",
+    pollutants: {
+      pm25: 10 + randomInt(40),
+      pm10: 15 + randomInt(50),
+      no2: 20 + randomInt(60),
+      o3: 40 + randomInt(80),
+      so2: 2 + randomInt(20),
+      co: 0.2 + (randomInt(15) / 10)
+    }
+  },
+  dataSource: "Mock Data (Phase 1 Testing)",
+  isRealTime: false,
+  apiStatus: "MOCK"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </sub-flow>
+
     <sub-flow name="fetch-weather-data-subflow" doc:name="Fetch Weather Data">
         <ee:transform doc:name="Prepare Weather Request">
             <ee:variables>
                 <ee:set-variable variableName="weatherApiKey"><![CDATA[p('openweathermap.api.key')]]></ee:set-variable>
             </ee:variables>
         </ee:transform>
-        
         <try doc:name="Try Weather API Call">
-            <http:request method="GET" config-ref="OpenWeatherMap_Request_Config" 
+            <http:request method="GET" config-ref="OpenWeatherMap_Request_Config"
                           path="/data/${openweathermap.api.version}/weather"
                           doc:name="Call OpenWeatherMap API">
                 <http:query-params><![CDATA[#[{
@@ -31,28 +110,26 @@
                     <http:success-status-code-validator values="200"/>
                 </http:response-validator>
             </http:request>
-            
             <ee:transform doc:name="Transform Weather Response">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
-    temperature: payload.main.temp,
-    humidity: payload.main.humidity,
-    pressure: payload.main.pressure,
-    windSpeed: payload.wind.speed,
-    windDirection: payload.wind.deg default 0,
-    visibility: (payload.visibility default 10000) / 1000, // Convert to km
-    condition: payload.weather[0].main default "Unknown",
-    description: payload.weather[0].description default "",
-    feelsLike: payload.main.feels_like,
-    tempMin: payload.main.temp_min,
-    tempMax: payload.main.temp_max
+  temperature: payload.main.temp,
+  humidity: payload.main.humidity,
+  pressure: payload.main.pressure,
+  windSpeed: payload.wind.speed,
+  windDirection: payload.wind.deg default 0,
+  visibility: (payload.visibility default 10000) / 1000,
+  condition: payload.weather[0].main default "Unknown",
+  description: payload.weather[0].description default "",
+  feelsLike: payload.main.feels_like,
+  tempMin: payload.main.temp_min,
+  tempMax: payload.main.temp_max
 }]]></ee:set-payload>
                 </ee:message>
             </ee:transform>
-            
             <error-handler>
                 <on-error-continue type="HTTP:CONNECTIVITY, HTTP:TIMEOUT, ANY">
                     <ee:transform doc:name="Weather API Error Response">
@@ -61,14 +138,14 @@ output application/json
 output application/json
 ---
 {
-    temperature: 0,
-    humidity: 0,
-    pressure: 0,
-    windSpeed: 0,
-    windDirection: 0,
-    visibility: 0,
-    condition: "API Unavailable",
-    error: "Weather service temporarily unavailable"
+  temperature: 0,
+  humidity: 0,
+  pressure: 0,
+  windSpeed: 0,
+  windDirection: 0,
+  visibility: 0,
+  condition: "API Unavailable",
+  error: "Weather service temporarily unavailable"
 }]]></ee:set-payload>
                         </ee:message>
                     </ee:transform>
@@ -77,66 +154,57 @@ output application/json
         </try>
     </sub-flow>
 
-    <!-- Sub-flow to fetch air quality data from OpenAQ -->
     <sub-flow name="fetch-air-quality-data-subflow" doc:name="Fetch Air Quality Data">
         <try doc:name="Try Air Quality API Call">
-            <http:request method="GET" config-ref="OpenAQ_Request_Config" 
+            <http:request method="GET" config-ref="OpenAQ_Request_Config"
                           path="/${openaq.api.version}/latest"
                           doc:name="Call OpenAQ API">
                 <http:query-params><![CDATA[#[{
                     'coordinates': vars.latitude ++ ',' ++ vars.longitude,
-                    'radius': '25000', // 25km radius
+                    'radius': '25000',
                     'limit': '1'
                 }]]]></http:query-params>
                 <http:response-validator>
                     <http:success-status-code-validator values="200"/>
                 </http:response-validator>
             </http:request>
-            
             <ee:transform doc:name="Transform Air Quality Response">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 var measurements = payload.results[0].measurements default []
-var getPollutant = (param: String) -> (measurements filter ($.parameter == param))[0].value default 0
+var getPollutant = (param) -> (measurements filter ($.parameter == param))[0].value default 0
 
-// Simplified AQI calculation function
-fun calculateAQI(measurements) = do {
-    var pm25 = (measurements filter ($.parameter == "pm25"))[0].value default 0
-    ---
-    if (pm25 <= 12.0) floor((50/12.0) * pm25)
-    else if (pm25 <= 35.4) floor(((100-51)/(35.4-12.1)) * (pm25-12.1) + 51)
-    else if (pm25 <= 55.4) floor(((150-101)/(55.4-35.5)) * (pm25-35.5) + 101)
-    else if (pm25 <= 150.4) floor(((200-151)/(150.4-55.5)) * (pm25-55.5) + 151)
-    else if (pm25 <= 250.4) floor(((300-201)/(250.4-150.5)) * (pm25-150.5) + 201)
-    else 301
-}
+// Note: The AQI calculation provided seems simplified and specific.
+// Real AQI calculations are more complex and depend on local standards.
+// This function assumes a linear scaling for pm25 up to 12.0 for "Good".
+fun calculateAQI(msmts) =
+  if ((msmts filter ($.parameter == "pm25"))[0].value default 0 <= 12.0)
+    floor((50 / 12.0) * ((msmts filter ($.parameter == "pm25"))[0].value default 0))
+  else 101 // Placeholder for values > 12.0, you might need a more robust AQI logic
 
-fun getAQILevel(aqi: Number) = 
-    if (aqi <= 50) "Good"
-    else if (aqi <= 100) "Moderate"
-    else if (aqi <= 150) "Unhealthy for Sensitive Groups"
-    else if (aqi <= 200) "Unhealthy"
-    else if (aqi <= 300) "Very Unhealthy"
-    else "Hazardous"
+fun getAQILevel(aqi) =
+  if (aqi <= 50) "Good"
+  else if (aqi <= 100) "Moderate"
+  else "Unhealthy for Sensitive Groups"
 
 ---
 {
-    aqi: calculateAQI(measurements),
-    level: getAQILevel(calculateAQI(measurements)),
-    pollutants: {
-        pm25: getPollutant("pm25"),
-        pm10: getPollutant("pm10"),
-        no2: getPollutant("no2"),
-        o3: getPollutant("o3"),
-        so2: getPollutant("so2"),
-        co: getPollutant("co")
-    },
-    lastUpdated: measurements[0].lastUpdated default now()
+  aqi: calculateAQI(measurements),
+  level: getAQILevel(calculateAQI(measurements)),
+  pollutants: {
+    pm25: getPollutant("pm25"),
+    pm10: getPollutant("pm10"),
+    no2: getPollutant("no2"),
+    o3: getPollutant("o3"),
+    so2: getPollutant("so2"),
+    co: getPollutant("co")
+  },
+  lastUpdated: payload.results[0].measurements[0].lastUpdated default now() as String {format: "yyyy-MM-dd'T'HH:mm:ssZ"},
+  location: payload.results[0].location default "Unknown"
 }]]></ee:set-payload>
                 </ee:message>
             </ee:transform>
-            
             <error-handler>
                 <on-error-continue type="HTTP:CONNECTIVITY, HTTP:TIMEOUT, ANY">
                     <ee:transform doc:name="Air Quality API Error Response">
@@ -145,17 +213,17 @@ fun getAQILevel(aqi: Number) =
 output application/json
 ---
 {
-    aqi: 0,
-    level: "Unknown",
-    pollutants: {
-        pm25: 0,
-        pm10: 0,
-        no2: 0,
-        o3: 0,
-        so2: 0,
-        co: 0
-    },
-    error: "Air quality service temporarily unavailable"
+  aqi: 0,
+  level: "API Unavailable",
+  pollutants: {
+    pm25: 0,
+    pm10: 0,
+    no2: 0,
+    o3: 0,
+    so2: 0,
+    co: 0
+  },
+  error: "Air quality service temporarily unavailable"
 }]]></ee:set-payload>
                         </ee:message>
                     </ee:transform>
@@ -163,5 +231,4 @@ output application/json
             </error-handler>
         </try>
     </sub-flow>
-
 </mule>

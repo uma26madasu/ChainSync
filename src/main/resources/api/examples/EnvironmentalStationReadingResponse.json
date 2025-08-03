@@ -1,0 +1,15 @@
+{
+  "stationId": "STATION_ATL_034",
+  "sensorType": "WATER_QUALITY",
+  "data": {
+    "E.coli": "Not Detected",
+    "pH": 7.1,
+    "Turbidity": "Normal",
+    "Temperature": 18.4
+  },
+  "readingTimestamp": "2025-07-16T08:30:00Z",
+  "submittedBy": "UMA.MADASU",
+  "processingStatus": "ACCEPTED",
+  "ingestedAt": "2025-07-16T08:31:00Z",
+  "message": "Reading integrated successfully into analytics pipeline."
+}

@@ -1,0 +1,27 @@
+{
+  "reportId": "REPORT_20250715_001",
+  "facilityId": "VEOLIA_WTP_001",
+  "reportType": "VIOLATION_RESPONSE",
+  "regulatoryAgency": "EPA",
+  "complianceStatus": "VIOLATION",
+  "submissionDeadline": "2025-07-15T23:59:00Z",
+  "submissionStatus": "ACKNOWLEDGED",
+  "confirmationNumber": "EPA_PUSH_20250715_1200",
+  "reportContent": {
+    "violationDetails": "Detected E. coli exceedance beyond EPA safety limits.",
+    "correctiveActions": [
+      "Activated containment protocol",
+      "Issued boil water advisory",
+      "Dispatched emergency response team"
+    ],
+    "timeline": "2025-07-14T08:00:00Z to 2025-07-15T12:00:00Z",
+    "monitoringData": {
+      "sampleDate": "2025-07-14",
+      "labResults": {
+        "E.coli": "Detected",
+        "pH": 6.8,
+        "Turbidity": "High"
+      }
+    }
+  }
+}

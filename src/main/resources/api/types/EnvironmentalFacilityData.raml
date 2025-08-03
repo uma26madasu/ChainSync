@@ -1,0 +1,50 @@
+#%RAML 1.0 Library
+types:
+
+  EnvironmentalFacilityData:
+    type: object
+    displayName: EnvironmentalFacilityData
+    properties:
+      facilityId: string
+      facilityName: string
+      location: string
+      coordinates:
+        type: object
+        properties:
+          latitude: number
+          longitude: number
+      environmentalParameters:
+        type: object
+        properties:
+          waterQuality:
+            type: object
+            properties:
+              turbidity: number
+              ph: number
+              chlorineResidual: number
+              bacterialCount:
+                type: object
+                properties:
+                  totalColiform: integer
+                  eColi: integer
+          airQuality:
+            type: object
+            properties:
+              emissions:
+                type: object
+                properties:
+                  particulateMatter: number
+                  nox: number
+                  so2: number
+                  co: number
+      complianceStatus:
+        type: object
+        properties:
+          epaCompliant: boolean
+          stateCompliant: boolean
+          lastViolation:
+            type: string
+            description: ISO date string
+          nextInspection:
+            type: string
+            description: ISO date string

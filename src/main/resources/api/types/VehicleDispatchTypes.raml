@@ -1,0 +1,32 @@
+#%RAML 1.0 Library
+
+types:
+
+  VehicleDispatchCommand:
+    type: object
+    displayName: Vehicle Dispatch Command
+    description: Instruction set for dispatching or rerouting an environmental service vehicle
+    properties:
+      dispatchId: string
+      vehicleId: string
+      taskType:
+        type: string
+        enum: ["EMERGENCY_WATER_SUPPORT", "HAZMAT_REMOVAL", "MOBILE_LAB_DEPLOYMENT", "WASTE_COLLECTION", "ROUTINE_MAINTENANCE"]
+      priority:
+        type: string
+        enum: ["LOW", "MEDIUM", "HIGH", "URGENT"]
+      destination:
+        type: object
+        properties:
+          facilityId: string
+          coordinates:
+            type: object
+            properties:
+              lat: number
+              lon: number
+      dispatchWindow:
+        type: object
+        properties:
+          startTime: datetime
+          endTime: datetime
+      notes?: string

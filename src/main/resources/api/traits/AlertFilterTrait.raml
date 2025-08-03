@@ -1,0 +1,11 @@
+#%RAML 1.0 Trait
+
+queryParameters:
+  alertLevel?:
+    type: string
+    enum: ["WARNING", "EMERGENCY", "CRITICAL"]
+    description: Filter alerts by severity
+  emergencyType?:
+    type: string
+    enum: ["WATER_QUALITY_EXCEEDANCE", "EMISSION_VIOLATION", "SPILL_INCIDENT", "EQUIPMENT_FAILURE", "CONTAMINATION_EVENT"]
+    description: Filter by type of emergency

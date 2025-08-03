@@ -7,7 +7,7 @@
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>mule-application</packaging>
 
-	<name>ChainSync Platform API</name>
+	<name>ChainSync-Platform-API</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -43,7 +43,6 @@
 			<version>1.9.1</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
-		
 		<!-- Mule Database Connector -->
 		<dependency>
 			<groupId>org.mule.connectors</groupId>
@@ -51,7 +50,6 @@
 			<version>1.14.8</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
-		
 		<!-- Mule Sockets Connector -->
 		<dependency>
 			<groupId>org.mule.connectors</groupId>
@@ -59,7 +57,6 @@
 			<version>1.2.4</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
-		
 		<!-- APIkit Module -->
 		<dependency>
 			<groupId>org.mule.modules</groupId>
@@ -67,7 +64,6 @@
 			<version>1.10.4</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
-		
 		<!-- PostgreSQL Driver -->
 		<dependency>
 			<groupId>org.postgresql</groupId>

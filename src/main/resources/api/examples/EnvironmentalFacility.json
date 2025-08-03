@@ -1,0 +1,60 @@
+[
+  {
+    "facilityId": "FACILITY_001",
+    "facilityName": "Minimal Water Treatment Unit",
+    "facilityType": "WATER_TREATMENT",
+    "operationalCapacity": "25 million gallons/day",
+    "location": "Springfield, MA",
+    "coordinates": {
+      "latitude": 42.1015,
+      "longitude": -72.5898
+    },
+    "environmentalParameters": {
+      "waterQuality": {
+        "turbidity": 0.2,
+        "ph": 7.0,
+        "chlorineResidual": 0.7,
+        "bacterialCount": {
+          "totalColiform": 0,
+          "eColi": 0
+        }
+      },
+      "airQuality": {
+        "emissions": {
+          "particulateMatter": 12.0,
+          "nox": 30.5,
+          "so2": 5.2,
+          "co": 10.1
+        }
+      }
+    },
+    "operationalStatus": {
+      "operationMode": "NORMAL",
+      "equipmentStatus": "OPTIMAL",
+      "processingEfficiency": 96.2,
+      "backupSystems": ["Emergency Pump"]
+    },
+    "complianceStatus": {
+      "epaCompliant": true,
+      "stateCompliant": true,
+      "localCompliant": true,
+      "lastViolation": "2024-10-01",
+      "nextInspection": "2025-07-20"
+    },
+    "riskAssessment": {
+      "environmentalRiskScore": 2,
+      "regulatoryRisk": "LOW",
+      "publicHealthRisk": "MINIMAL",
+      "emergencyCoordinationRequired": false,
+      "estimatedResponseTime": "Not required"
+    },
+    "emergencyContacts": {
+      "facilityManager": "Lisa Brown",
+      "environmentalCompliance": "Paul Martinez",
+      "emergencyCoordinator": "Dana Kim"
+    },
+    "dataSource": "ChainSync Environmental Monitoring",
+    "timestamp": "2025-07-09T20:00:00Z",
+    "isRealTime": true
+  }
+]

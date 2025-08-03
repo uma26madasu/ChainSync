@@ -1,0 +1,69 @@
+{
+  "vehicleId": "WATER_TRUCK_001",
+  "vehicleType": "WATER_TANK_TRUCK",
+  "operatorId": "TECH_001",
+  "operatorName": "Maria Rodriguez, Environmental Technician",
+  "serviceArea": "Northeast Water District",
+  "location": "New York, NY",
+  "coordinates": {
+    "latitude": 40.7128,
+    "longitude": -74.0060
+  },
+  "vehicleCapacity": {
+    "maxCapacity": "5000 gallons",
+    "currentLoad": "4200 gallons potable water",
+    "loadType": "POTABLE_WATER"
+  },
+  "operationalData": {
+    "speed": 45,
+    "engineStatus": "NORMAL",
+    "fuelLevel": 75,
+    "equipmentStatus": {
+      "pumpSystem": "OPERATIONAL",
+      "tankIntegrity": "GOOD",
+      "safetyEquipment": "COMPLIANT"
+    },
+    "lastGPSUpdate": "2025-07-09T17:45:00Z"
+  },
+  "technicianMetrics": {
+    "hoursOnDuty": 6.5,
+    "serviceCallsCompleted": 8,
+    "safetyComplianceScore": 9,
+    "lastBreak": "2025-07-09T15:00:00Z",
+    "certificationStatus": "CURRENT",
+    "environmentalTraining": [
+      "HAZMAT Response",
+      "Water Quality Testing",
+      "Waste Handling"
+    ]
+  },
+  "serviceHistory": {
+    "lastServiceDate": "2025-06-15",
+    "nextServiceDue": 52500,
+    "maintenanceStatus": "CURRENT",
+    "inspectionStatus": {
+      "dotInspection": "2025-03-15",
+      "environmentalInspection": "2025-04-20"
+    }
+  },
+  "emergencyCapability": {
+    "emergencyResponse": true,
+    "responseType": [
+      "Water emergency",
+      "Spill response",
+      "Equipment delivery"
+    ],
+    "responseTime": "15 minutes",
+    "availabilityStatus": "AVAILABLE"
+  },
+  "riskAssessment": {
+    "operationalRiskScore": 2,
+    "environmentalRisk": "MINIMAL",
+    "safetyRisk": "LOW",
+    "coordinationRequired": false,
+    "lastRiskAssessment": "2025-07-09T17:30:00Z"
+  },
+  "dataSource": "ChainSync Environmental Services Monitoring",
+  "timestamp": "2025-07-09T17:45:00Z",
+  "isRealTime": true
+}

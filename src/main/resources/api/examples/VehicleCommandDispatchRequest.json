@@ -1,0 +1,18 @@
+{
+  "dispatchId": "DISPATCH_20250715_TRUCK1121",
+  "vehicleId": "TRUCK_1121",
+  "taskType": "EMERGENCY_WATER_SUPPORT",
+  "priority": "HIGH",
+  "destination": {
+    "facilityId": "WTP_NYC_021",
+    "coordinates": {
+      "lat": 40.7128,
+      "lon": -74.0060
+    }
+  },
+  "dispatchWindow": {
+    "startTime": "2025-07-15T14:00:00Z",
+    "endTime": "2025-07-15T18:00:00Z"
+  },
+  "notes": "Emergency water service reroute to NYC treatment plant due to contamination event."
+}

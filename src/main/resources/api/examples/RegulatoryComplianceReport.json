@@ -1,0 +1,28 @@
+[
+  {
+    "reportId": "EPA_REPORT_20250609_001",
+    "facilityId": "VEOLIA_WTP_NYC_001",
+    "reportType": "IMMEDIATE_NOTIFICATION",
+    "regulatoryAgency": "EPA",
+    "complianceStatus": "VIOLATION",
+    "submissionDeadline": "2025-06-09T21:00:00Z",
+    "submissionStatus": "AUTO_SUBMITTED",
+    "confirmationNumber": "EPA-2025-0609-1234",
+    "reportContent": {
+      "violationDetails": "E. coli detected at 15 CFU/100ml, exceeding EPA standard of 0 CFU/100ml",
+      "correctiveActions": [
+        "Activated backup disinfection system",
+        "Increased chlorination",
+        "Initiated source water investigation"
+      ],
+      "timeline": "Issue detected at 14:30, corrective actions initiated by 15:00",
+      "monitoringData": {
+        "turbidity": 0.18,
+        "chlorineResidual": 0.6,
+        "eColi": 15,
+        "totalColiform": 20,
+        "ph": 7.3
+      }
+    }
+  }
+]

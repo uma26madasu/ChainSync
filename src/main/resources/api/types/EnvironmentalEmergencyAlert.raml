@@ -1,0 +1,22 @@
+#%RAML 1.0 Library
+
+types:
+
+  EnvironmentalEmergencyAlert:
+    type: object
+    displayName: EnvironmentalEmergencyAlert
+    properties:
+      alertId: string
+      facilityId: string
+      emergencyType:
+        type: string
+        enum: ["WATER_QUALITY_EXCEEDANCE", "EMISSION_VIOLATION", "SPILL_INCIDENT", "EQUIPMENT_FAILURE", "CONTAMINATION_EVENT"]
+      alertLevel:
+        type: string
+        enum: ["WARNING", "EMERGENCY", "CRITICAL"]
+      triggerCondition: string
+      overrideReason?: string
+      affectedPopulation?: integer
+      timestamp:
+        type: datetime
+        required: true

@@ -1,0 +1,11 @@
+#%RAML 1.0 Trait
+
+    queryParameters:
+      facilityType?:
+        type: string
+        enum: ["WATER_TREATMENT", "WASTE_PROCESSING", "ENERGY_GENERATION"]
+        description: Filter by facility type
+      complianceStatus?:
+        type: string
+        enum: ["COMPLIANT", "VIOLATION", "WARNING"]
+        description: Filter by environmental compliance status

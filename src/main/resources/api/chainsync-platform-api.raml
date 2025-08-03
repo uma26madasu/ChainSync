@@ -1,1304 +1,322 @@
 #%RAML 1.0
-title: ChainSync Unified Platform API
+title: ChainSync Environmental Services Platform API
 version: v1.0
-description: |
-  ChainSync Unified Platform API - Comprehensive environmental monitoring and fleet management system.
-  Provides real-time environmental data monitoring, air quality alerts, vehicle tracking, driver performance analytics, and emergency coordination workflows.
-
-protocols: [HTTP, HTTPS]
-baseUri: https://chainsync-platform-api.cloudhub.io/api
+baseUri: https://api.chainsync.com/
 mediaType: application/json
+uses:
+  FacilityTypes: types/EnvironmentalFacilityData.raml
+  StationTypes: types/EnvironmentalStationData.raml
+  VehicleTypes: types/EnvironmentalServiceVehicle.raml
+  AlertTypes: types/EnvironmentalEmergencyAlert.raml
+  ComplianceTypes: types/RegulatoryComplianceReport.raml
+  CommonTypes: types/ErrorResponse.raml
+  StationReadingTypes: types/EnvironmentalStationReading.raml
+  FacilityIncidentTypes: types/FacilityIncident.raml
+  VehicleDispatchTypes: types/VehicleDispatchTypes.raml
 
-types:
-  # ==========================================
-  # ENVIRONMENTAL DATA TYPES
-  # ==========================================
-  EnvironmentalData:
-    type: object
-    description: Complete environmental monitoring data from monitoring stations
-    properties:
-      stationId: 
-        type: string
-        description: Unique monitoring station identifier
-        example: "NYC_CENTRAL_001"
-      city:
-        type: string
-        description: City name
-        example: "New York"
-      country:
-        type: string
-        description: Country code (ISO 3166-1 alpha-2)
-        example: "US"
-      coordinates:
-        type: object
-        properties:
-          latitude: 
-            type: number
-            description: Latitude coordinate
-            example: 40.7128
-          longitude: 
-            type: number
-            description: Longitude coordinate
-            example: -74.0060
-      airQuality:
-        type: object
-        properties:
-          aqi:
-            type: integer
-            minimum: 0
-            maximum: 500
-            description: Air Quality Index (EPA standard)
-            example: 45
-          level:
-            type: string
-            enum: [Good, Moderate, "Unhealthy for Sensitive Groups", Unhealthy, "Very Unhealthy", Hazardous]
-            example: "Good"
-          pollutants:
-            type: object
-            properties:
-              pm25: 
-                type: number
-                description: PM2.5 concentration (μg/m³)
-                example: 8.5
-              pm10:
-                type: number
-                description: PM10 concentration (μg/m³)
-                example: 15.2
-              no2:
-                type: number
-                description: Nitrogen dioxide (μg/m³)
-                example: 25.1
-              o3:
-                type: number
-                description: Ozone (μg/m³)
-                example: 45.3
-              so2:
-                type: number
-                description: Sulfur dioxide (μg/m³)
-                example: 2.1
-              co:
-                type: number
-                description: Carbon monoxide (mg/m³)
-                example: 0.3
-      weather:
-        type: object
-        properties:
-          temperature:
-            type: number
-            description: Temperature in Celsius
-            example: 22.5
-          humidity:
-            type: number
-            description: Humidity percentage
-            example: 65
-          pressure:
-            type: number
-            description: Atmospheric pressure (hPa)
-            example: 1013.25
-          windSpeed:
-            type: number
-            description: Wind speed (km/h)
-            example: 12.5
-          windDirection:
-            type: integer
-            description: Wind direction (degrees)
-            example: 180
-          visibility:
-            type: number
-            description: Visibility (km)
-            example: 10
-          condition:
-            type: string
-            description: Weather condition
-            example: "Clear"
-      riskAssessment:
-        type: object
-        properties:
-          riskScore:
-            type: integer
-            minimum: 1
-            maximum: 10
-            description: ChainSync risk score (1=low, 10=critical)
-            example: 3
-          emergencyLevel:
-            type: string
-            enum: [LOW, MEDIUM, HIGH, CRITICAL]
-            example: "LOW"
-          coordinationRequired:
-            type: boolean
-            description: Whether emergency coordination is needed
-            example: false
-          estimatedResponseTime:
-            type: string
-            description: Recommended response time
-            example: "Not required"
-      dataSource:
-        type: string
-        description: Original data provider
-        example: "ChainSync Environmental Monitoring"
-      timestamp:
-        type: datetime
-        description: Data collection timestamp
-        example: "2025-06-09T20:00:00Z"
-      isRealTime:
-        type: boolean
-        description: Real-time vs historical data
-        example: true
 
-  # ==========================================
-  # FLEET MANAGEMENT TYPES
-  # ==========================================
-  VehicleData:
-    type: object
-    description: Complete vehicle monitoring data including telemetrics and driver information
-    properties:
-      vehicleId: 
-        type: string
-        description: Unique vehicle identifier
-        example: "TRUCK_001"
-      driverId: 
-        type: string
-        description: Unique driver identifier
-        example: "D001"
-      driverName: 
-        type: string
-        description: Driver's full name
-        example: "John Martinez"
-      vehicleType:
-        type: string
-        enum: ["Semi Truck", "Delivery Van", "Pickup Truck", "Box Truck"]
-        description: Type of vehicle
-        example: "Semi Truck"
-      location:
-        type: string
-        description: Current location (city/region)
-        example: "New York"
-      coordinates:
-        type: object
-        properties:
-          latitude: 
-            type: number
-            description: Current latitude
-            example: 40.7128
-          longitude: 
-            type: number
-            description: Current longitude
-            example: -74.0060
-      telematicsData:
-        type: object
-        description: Real-time vehicle telemetrics
-        properties:
-          speed:
-            type: integer
-            minimum: 0
-            maximum: 120
-            description: Current speed (mph)
-            example: 65
-          averageSpeed:
-            type: integer
-            description: Average speed for current trip
-            example: 58
-          brakingEvents:
-            type: integer
-            minimum: 0
-            description: Hard braking events count
-            example: 2
-          accelerationEvents:
-            type: integer
-            minimum: 0
-            description: Hard acceleration events count
-            example: 1
-          fuelEfficiency:
-            type: number
-            description: Current fuel efficiency (mpg)
-            example: 24.5
-          engineStatus:
-            type: string
-            enum: ["NORMAL", "WARNING", "CRITICAL"]
-            example: "NORMAL"
-          batteryLevel:
-            type: number
-            minimum: 0
-            maximum: 100
-            description: Battery percentage
-            example: 95
-          tirePressure:
-            type: string
-            enum: ["NORMAL", "LOW", "CRITICAL"]
-            example: "NORMAL"
-          odometerReading:
-            type: integer
-            description: Current odometer reading (miles)
-            example: 87500
-          engineHours:
-            type: integer
-            description: Total engine hours
-            example: 1750
-          lastGPSUpdate:
-            type: datetime
-            description: Last GPS update timestamp
-      driverMetrics:
-        type: object
-        description: Driver performance and compliance data
-        properties:
-          hoursOnDuty:
-            type: number
-            description: Hours on duty for current shift
-            example: 6.5
-          milesThisShift:
-            type: integer
-            description: Miles driven in current shift
-            example: 420
-          safetyScore:
-            type: integer
-            minimum: 1
-            maximum: 10
-            description: Driver safety score (1-10)
-            example: 8
-          lastBreak:
-            type: datetime
-            description: Last break timestamp
-          totalDrivingTime:
-            type: string
-            description: Total driving time for shift
-            example: "6 hours 30 minutes"
-          speedingViolations:
-            type: integer
-            minimum: 0
-            description: Speeding violations count
-            example: 0
-          idleTime:
-            type: string
-            description: Engine idle time
-            example: "15 minutes"
-      vehicleHealth:
-        type: object
-        description: Vehicle maintenance and health status
-        properties:
-          mileage:
-            type: integer
-            description: Total vehicle mileage
-            example: 87500
-          lastServiceDate:
-            type: date-only
-            description: Last maintenance service date
-            example: "2025-05-15"
-          nextServiceDue:
-            type: integer
-            description: Mileage when next service is due
-            example: 92500
-          maintenanceStatus:
-            type: string
-            enum: ["CURRENT", "DUE_SOON", "OVERDUE"]
-            example: "CURRENT"
-          fuelLevel:
-            type: number
-            minimum: 0
-            maximum: 100
-            description: Fuel level percentage
-            example: 75
-          engineTemp:
-            type: number
-            description: Engine temperature (Fahrenheit)
-            example: 195
-          oilPressure:
-            type: string
-            enum: ["NORMAL", "LOW", "CRITICAL"]
-            example: "NORMAL"
-          brakeStatus:
-            type: string
-            enum: ["GOOD", "FAIR", "NEEDS_REPLACEMENT"]
-            example: "GOOD"
-          transmissionStatus:
-            type: string
-            enum: ["NORMAL", "WARNING", "CRITICAL"]
-            example: "NORMAL"
-      riskAssessment:
-        type: object
-        description: Real-time risk evaluation and response requirements
-        properties:
-          riskScore:
-            type: integer
-            minimum: 1
-            maximum: 10
-            description: Overall risk score (1=low, 10=critical)
-            example: 3
-          status:
-            type: string
-            enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-            example: "LOW"
-          coordinationRequired:
-            type: boolean
-            description: Whether emergency coordination is needed
-            example: false
-          estimatedResponseTime:
-            type: string
-            description: Required response time for current risk level
-            example: "Not required"
-          riskFactors:
-            type: array
-            items: string
-            description: List of identified risk factors
-            example: []
-          lastRiskAssessment:
-            type: datetime
-            description: Last risk assessment timestamp
-          riskTrend:
-            type: string
-            enum: ["STABLE", "INCREASING", "DECREASING"]
-            example: "STABLE"
-      dataSource:
-        type: string
-        description: Source system for vehicle data
-        example: "ChainSync Fleet Monitoring"
-      timestamp:
-        type: datetime
-        description: Data collection timestamp
-      isRealTime:
-        type: boolean
-        description: Whether data is real-time or historical
-        example: true
-
-  # ==========================================
-  # ALERT TYPES
-  # ==========================================
-  EnvironmentalAlert:
-    type: object
-    description: Environmental emergency alert with coordination workflow
-    properties:
-      alertId:
-        type: string
-        description: Unique alert identifier
-        example: "ENV_ALERT_NYC_20250609_001"
-      stationId: 
-        type: string
-        description: Station identifier
-        example: "NYC_CENTRAL_001"
-      city: 
-        type: string
-        description: City name
-        example: "New York"
-      alertLevel:
-        type: string
-        enum: [WARNING, EMERGENCY, CRITICAL]
-        description: Alert severity level
-        example: "CRITICAL"
-      riskScore: 
-        type: integer
-        minimum: 1
-        maximum: 10
-        description: Associated risk score
-        example: 9
-      triggerCondition:
-        type: string
-        description: What triggered the alert
-        example: "AQI exceeded 150 (Unhealthy threshold)"
-      coordinationWorkflow:
-        type: object
-        properties:
-          workflowId: 
-            type: string
-            example: "ENV_WF_20250609_001"
-          meetingScheduled: 
-            type: boolean
-            example: true
-          estimatedMeetingTime: 
-            type: datetime
-            example: "2025-06-09T20:30:00Z"
-          stakeholders: 
-            type: array
-            items: string
-            example: ["Environmental Response Team", "Public Health Officials", "Emergency Services"]
-          actionItems: 
-            type: array
-            items: string
-            example: ["Issue public health advisory", "Activate air purification systems", "Monitor vulnerable populations"]
-      createdAt: 
-        type: datetime
-        description: Alert creation timestamp
-
-  FleetAlert:
-    type: object
-    description: Fleet emergency alert with coordination workflow
-    properties:
-      alertId:
-        type: string
-        description: Unique alert identifier
-        example: "FLEET_ALERT_20250609_TRUCK_001"
-      vehicleId: 
-        type: string
-        description: Vehicle identifier
-        example: "TRUCK_001"
-      driverId:
-        type: string
-        description: Driver identifier
-        example: "D001"
-      driverName:
-        type: string
-        description: Driver name
-        example: "John Martinez"
-      alertType:
-        type: string
-        enum: ["EMERGENCY", "MAINTENANCE", "SAFETY", "COMPLIANCE", "MANUAL"]
-        description: Type of alert
-        example: "SAFETY"
-      alertLevel:
-        type: string
-        enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-        description: Alert severity level
-        example: "HIGH"
-      riskScore:
-        type: integer
-        minimum: 1
-        maximum: 10
-        description: Associated risk score
-        example: 7
-      triggerCondition:
-        type: string
-        description: Condition that triggered the alert
-        example: "Driver exceeded 8 hours of continuous driving"
-      location:
-        type: string
-        description: Current vehicle location
-        example: "Chicago, IL"
-      coordinationWorkflow:
-        type: object
-        description: Emergency coordination workflow details
-        properties:
-          workflowId: 
-            type: string
-            example: "FLEET_WF_20250609_001"
-          meetingScheduled: 
-            type: boolean
-            example: true
-          estimatedResponseTime: 
-            type: datetime
-            example: "2025-06-09T16:20:00Z"
-          stakeholders: 
-            type: array
-            items: string
-            example: ["Fleet Manager", "Safety Coordinator", "Driver Support Team"]
-          actionItems: 
-            type: array
-            items: string
-            example: ["Contact driver immediately", "Assess vehicle condition", "Schedule inspection"]
-      slotifyIntegration:
-        type: object
-        description: Slotify scheduling integration details
-        properties:
-          enabled: 
-            type: boolean
-            example: true
-          endpoint: 
-            type: string
-            example: "https://slotify-engine/api/fleet-emergency-scheduling"
-          schedulingWindow: 
-            type: string
-            example: "IMMEDIATE"
-      createdAt:
-        type: datetime
-        description: Alert creation timestamp
-
-  # ==========================================
-  # PERFORMANCE & ANALYTICS TYPES
-  # ==========================================
-  DriverPerformance:
-    type: object
-    description: Driver performance analytics and metrics
-    properties:
-      driverId: 
-        type: string
-        example: "D001"
-      driverName: 
-        type: string
-        example: "John Martinez"
-      vehicleCount:
-        type: integer
-        description: Number of vehicles operated
-        example: 1
-      averageRiskScore:
-        type: number
-        description: Average risk score for the period
-        example: 3.2
-      averageSafetyScore:
-        type: number
-        description: Average safety score for the period
-        example: 8.5
-      totalMiles:
-        type: integer
-        description: Total miles driven in period
-        example: 2150
-      averageSpeed:
-        type: number
-        description: Average driving speed
-        example: 62.5
-      totalBrakingEvents:
-        type: integer
-        description: Total hard braking events
-        example: 8
-      averageFuelEfficiency:
-        type: number
-        description: Average fuel efficiency (mpg)
-        example: 24.2
-      performanceRating:
-        type: string
-        enum: ["EXCELLENT", "GOOD", "FAIR", "NEEDS_IMPROVEMENT"]
-        example: "EXCELLENT"
-      riskLevel:
-        type: string
-        enum: ["LOW", "MEDIUM", "HIGH"]
-        example: "LOW"
-
-  # ==========================================
-  # COMMON TYPES
-  # ==========================================
-  ErrorResponse:
-    type: object
-    properties:
-      error:
-        type: object
-        properties:
-          code: 
-            type: string
-            example: "RESOURCE_NOT_FOUND"
-          message: 
-            type: string
-            example: "Requested resource was not found"
-          details?:
-            type: string
-            description: Additional error details
-          timestamp: 
-            type: datetime
-            example: "2025-06-09T20:00:00Z"
 
 traits:
-  pageable:
-    queryParameters:
-      limit?:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
-        description: Maximum number of records to return
-      offset?:
-        type: integer
-        minimum: 0
-        default: 0
-        description: Number of records to skip for pagination
+  pageable: !include traits/PaginationTrait.raml
+  facilityFilterable: !include traits/FacilityFilteringTrait.raml
+  alertFilterable: !include traits/AlertFilterTrait.raml
+  vehicleFilterable: !include traits/VehicleFilterTrait.raml
+  geoFilterable: !include traits/GeoFilterTrait.raml
+  timeRange: !include traits/TimeRangeTrait.raml
+  sorting: !include traits/SortingTrait.raml
+  secured: !include traits/AuthTrait.raml
 
-  environmentalFilterable:
-    queryParameters:
-      city?:
-        type: string
-        description: Filter by city name
-        example: "New York"
-      country?:
-        type: string
-        description: Filter by country code
-        example: "US"
-      minRiskScore?:
-        type: integer
-        minimum: 0
-        maximum: 10
-        description: Minimum environmental risk score filter
-        default: 0
-      realTimeOnly?:
-        type: boolean
-        default: true
-        description: Return only real-time data
-
-  fleetFilterable:
-    queryParameters:
-      vehicleId?:
-        type: string
-        description: Filter by vehicle ID
-        example: "TRUCK_001"
-      driverId?:
-        type: string
-        description: Filter by driver ID
-        example: "D001"
-      location?:
-        type: string
-        description: Filter by location
-        example: "New York"
-      status?:
-        type: string
-        enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-        description: Filter by vehicle status
-      minRiskScore?:
-        type: integer
-        minimum: 0
-        maximum: 10
-        description: Minimum fleet risk score filter
-        default: 0
-
-# ==========================================
-# ENVIRONMENTAL MONITORING ENDPOINTS
-# ==========================================
-
-/environmental-data:
-  displayName: Environmental Data Collection
-  description: Core environmental monitoring endpoints
-  
+/environmental-facilities:
   get:
-    displayName: Get Current Environmental Data
-    description: |
-      Retrieve current environmental data for all monitored locations.
-      Includes air quality, weather conditions, and risk assessments.
-    is: [pageable, environmentalFilterable]
+    is: [pageable,facilityFilterable,sorting,geoFilterable]
+    responses:
+      200:
+        body:
+          application/json:
+            type: FacilityTypes.EnvironmentalFacilityData[]
+            example: !include examples/EnvironmentalFacility.json
+
+  /{facilityId}:
+    displayName: Single Environmental Facility Monitoring
+    description: Detailed environmental monitoring data for a specific facility
+    uriParameters:
+      facilityId:
+        type: string
+        description: Environmental facility identifier
+        example: "VEOLIA_WTP_NYC_001"
+    get:
+      displayName: Get Single Environmental Facility Data
+      description: Retrieve detailed monitoring data for the specified facility
+      responses:
+        200:
+          description: Environmental facility data retrieved successfully
+          body:
+            application/json:
+              type: FacilityTypes.EnvironmentalFacilityData
+              example: !include examples/EnvironmentalFacilitySingle.json
+        404:
+          description: Facility not found
+          body:
+            application/json:
+              type: CommonTypes.ErrorResponse
+              example:
+                error:
+                  code: "FACILITY_NOT_FOUND"
+                  message: "Environmental facility not found: UNKNOWN_FACILITY"
+                  timestamp: "2025-07-09T20:00:00Z"
+
+/environmental-service-vehicles:
+  get:
+    is: [pageable, vehicleFilterable, sorting, geoFilterable]
+    responses:
+      200:
+        description: List of environmental service vehicles retrieved successfully
+        body:
+          application/json:
+            type: VehicleTypes.EnvironmentalServiceVehicle[]
+            example: !include examples/EnvironmentalServiceVehicle.json
+
+/environmental-service-vehicles/{vehicleId}:
+  displayName: Single Environmental Services Vehicle
+  description: Detailed monitoring and dispatch control for a specific environmental services vehicle
+
+  uriParameters:
+    vehicleId:
+      type: string
+      description: Environmental services vehicle identifier
+      example: "TRUCK_1121"
+
+  get:
+    displayName: Get Vehicle Monitoring Data
+    description: Retrieve real-time status and telemetry of the specified service vehicle
+    is: [secured]
+    responses:
+      200:
+        description: Vehicle data retrieved successfully
+        body:
+          application/json:
+            type: VehicleTypes.EnvironmentalServiceVehicle
+            example: !include examples/EnvironmentalServiceVehicleSingle.json
+      404:
+        description: Vehicle not found
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
+            example: !include examples/ErrorVehicleNotFound.json
+
+  /dispatch:
+    post:
+      displayName: Dispatch Vehicle
+      description: Send dispatch instructions to the specified vehicle
+      is: [secured]
+      body:
+        application/json:
+          type: VehicleTypes.VehicleDispatchCommand
+          example: !include examples/VehicleCommandDispatchRequest.json
+      responses:
+        202:
+          description: Dispatch request accepted
+          body:
+            application/json:
+              type: VehicleTypes.VehicleDispatchStatus
+              example: !include examples/VehicleCommandDispatchResponse.json
+        400:
+          description: Invalid dispatch payload
+          body:
+            application/json:
+              type: CommonTypes.ErrorResponse
+        401:
+          description: Unauthorized dispatch attempt
+          body:
+            application/json:
+              type: CommonTypes.ErrorResponse
+
+/environmental-data/{stationId}:
+  displayName: Single Station Environmental Data
+  description: Retrieve current environmental data for a specific monitoring station
+
+  uriParameters:
+    stationId:
+      type: string
+      description: Monitoring station identifier
+      example: "NYC_CENTRAL_001"
+
+  get:
+    displayName: Get Station Environmental Data
+    description: Current air quality, weather, and environmental risk metrics for the station
+    is: [timeRange]
     responses:
       200:
         description: Environmental data retrieved successfully
         body:
           application/json:
-            type: object
-            properties:
-              data: EnvironmentalData[]
-              metadata:
-                type: object
-                properties:
-                  totalRecords: integer
-                  recordsReturned: integer
-                  page: integer
-                  hasMore: boolean
-                  lastUpdated: datetime
-                  filters: object
-            example:
-              data:
-                - stationId: "NYC_CENTRAL_001"
-                  city: "New York"
-                  country: "US"
-                  coordinates:
-                    latitude: 40.7128
-                    longitude: -74.0060
-                  airQuality:
-                    aqi: 45
-                    level: "Good"
-                    pollutants:
-                      pm25: 8.5
-                      pm10: 15.2
-                      no2: 25.1
-                      o3: 45.3
-                      so2: 2.1
-                      co: 0.3
-                  weather:
-                    temperature: 22.5
-                    humidity: 65
-                    pressure: 1013.25
-                    windSpeed: 12.5
-                    windDirection: 180
-                    visibility: 10
-                    condition: "Clear"
-                  riskAssessment:
-                    riskScore: 3
-                    emergencyLevel: "LOW"
-                    coordinationRequired: false
-                    estimatedResponseTime: "Not required"
-                  dataSource: "ChainSync Environmental Monitoring"
-                  timestamp: "2025-06-09T20:00:00Z"
-                  isRealTime: true
-              metadata:
-                totalRecords: 6
-                recordsReturned: 6
-                page: 1
-                hasMore: false
-                lastUpdated: "2025-06-09T20:00:00Z"
-                filters:
-                  city: null
-                  country: null
-                  minRiskScore: 0
-                  realTimeOnly: true
-      400:
-        description: Bad request - invalid parameters
-        body:
-          application/json:
-            type: ErrorResponse
-      500:
-        description: Internal server error
-        body:
-          application/json:
-            type: ErrorResponse
-
-  post:
-    displayName: Trigger Environmental Data Refresh
-    description: |
-      Manually trigger a refresh of environmental data from all sources.
-      Useful for testing and on-demand updates.
-    responses:
-      202:
-        description: Data refresh initiated
-        body:
-          application/json:
-            type: object
-            properties:
-              message: string
-              refreshId: string
-              estimatedCompletionTime: datetime
-            example:
-              message: "Environmental data refresh initiated"
-              refreshId: "REFRESH_20250609_200000"
-              estimatedCompletionTime: "2025-06-09T20:05:00Z"
-
-/environmental-data/{stationId}:
-  displayName: Single Station Data
-  description: Environmental data for specific monitoring station
-  uriParameters:
-    stationId:
-      type: string
-      description: Station identifier
-      example: "NYC_CENTRAL_001"
-  
-  get:
-    displayName: Get Station Environmental Data
-    description: Get current environmental data for specific station
-    responses:
-      200:
-        description: Station data retrieved successfully
-        body:
-          application/json:
-            type: EnvironmentalData
+            type: StationTypes.EnvironmentalStationData
+            example: !include /examples/EnvironmentalStationSingle.json
       404:
-        description: Station not found
+        description: Monitoring station not found
         body:
           application/json:
-            type: ErrorResponse
+            type: CommonTypes.ErrorResponse
             example:
               error:
                 code: "STATION_NOT_FOUND"
-                message: "Station not found: UNKNOWN_STATION"
-                timestamp: "2025-06-09T20:00:00Z"
+                message: "Monitoring station not found: UNKNOWN_STATION"
+                timestamp: "2025-07-09T20:00:00Z"
 
-/emergency-alerts:
-  displayName: Environmental Emergency Alerts
-  description: Environmental emergency alert management endpoints
-  
-  get:
-    displayName: Get Active Emergency Alerts
-    description: |
-      Retrieve all active environmental emergency alerts.
-      Includes alerts requiring immediate coordination.
-    is: [pageable]
-    queryParameters:
-      alertLevel?:
-        type: string
-        enum: [WARNING, EMERGENCY, CRITICAL]
-        description: Filter by alert level
-      city?:
-        type: string
-        description: Filter by city
-    responses:
-      200:
-        description: Emergency alerts retrieved successfully
-        body:
-          application/json:
-            type: object
-            properties:
-              alerts: EnvironmentalAlert[]
-              summary:
-                type: object
-                properties:
-                  totalAlerts: integer
-                  criticalAlerts: integer
-                  emergencyAlerts: integer
-                  warningAlerts: integer
-              timestamp: datetime
-            example:
-              alerts:
-                - alertId: "ENV_ALERT_BEI_20250609_001"
-                  stationId: "BEI_CENTRAL_001"
-                  city: "Beijing"
-                  alertLevel: "CRITICAL"
-                  riskScore: 9
-                  triggerCondition: "AQI exceeded 150 for 2 hours"
-                  coordinationWorkflow:
-                    workflowId: "ENV_WF_20250609_001"
-                    meetingScheduled: true
-                    estimatedMeetingTime: "2025-06-09T20:30:00Z"
-                    stakeholders: ["Environmental Response Team", "Public Health Officials", "Emergency Services"]
-                    actionItems: ["Issue public health advisory", "Activate air purification systems", "Monitor vulnerable populations"]
-                  createdAt: "2025-06-09T18:00:00Z"
-              summary:
-                totalAlerts: 1
-                criticalAlerts: 1
-                emergencyAlerts: 0
-                warningAlerts: 0
-              timestamp: "2025-06-09T20:00:00Z"
+/environmental-facilities/{facilityId}/incidents:
+  uriParameters:
+    facilityId:
+      type: string
+      description: Identifier of the environmental facility
+      example: "VEOLIA_WTP_NYC_001"
 
   post:
-    displayName: Create Manual Emergency Alert
-    description: |
-      Manually create an emergency alert for testing or override situations.
-      Triggers ChainSync coordination workflows.
+    is: [secured]
+    description: Submit a facility-based incident report for investigation and coordination
     body:
       application/json:
-        type: object
-        properties:
-          stationId: string
-          alertLevel: 
-            type: string
-            enum: [WARNING, EMERGENCY, CRITICAL]
-          triggerCondition: string
-          overrideReason?: string
-        example:
-          stationId: "NYC_CENTRAL_001"
-          alertLevel: "CRITICAL"
-          triggerCondition: "Unusual pollution spike detected"
-          overrideReason: "Manual testing of emergency response"
+        type: FacilityIncidentTypes.FacilityIncidentReport
+        example: !include examples/FacilityIncidentRequest.json
+    responses:
+      201:
+        description: Incident report accepted
+        body:
+          application/json:
+            type: FacilityIncidentTypes.FacilityIncidentReport
+            example: !include examples/FacilityIncidentResponse.json
+      400:
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
+      401:
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
+
+
+
+/environmental-emergency-alerts:
+  get:
+    is: [pageable, alertFilterable,sorting,geoFilterable,timeRange]
+    responses:
+      200:
+        body:
+          application/json:
+            type: AlertTypes.EnvironmentalEmergencyAlert[]
+            example: !include examples/EnvironmentalEmergencyAlert.json
+  post:
+    is: [secured]
+    description: Submit a new emergency alert affecting environmental service areas
+    body:
+      application/json:
+        type: AlertTypes.EnvironmentalEmergencyAlert
+        example: !include examples/EnvironmentalEmergencyAlertRequest.json
     responses:
       201:
         description: Emergency alert created successfully
         body:
           application/json:
-            type: EnvironmentalAlert
-
-# ==========================================
-# FLEET MONITORING ENDPOINTS
-# ==========================================
-
-/fleet-monitoring:
-  displayName: Fleet Monitoring
-  description: Core fleet monitoring and vehicle tracking endpoints
-  
-  get:
-    displayName: Get Fleet Monitoring Data
-    description: |
-      Retrieve real-time monitoring data for the entire fleet.
-      Includes vehicle locations, driver status, and safety metrics.
-    is: [pageable, fleetFilterable]
-    responses:
-      200:
-        description: Fleet monitoring data retrieved successfully
-        body:
-          application/json:
-            type: object
-            properties:
-              data: VehicleData[]
-              metadata:
-                type: object
-                properties:
-                  totalVehicles: integer
-                  recordsReturned: integer
-                  page: integer
-                  hasMore: boolean
-                  riskSummary:
-                    type: object
-                    properties:
-                      criticalVehicles: integer
-                      highRiskVehicles: integer
-                      mediumRiskVehicles: integer
-                      lowRiskVehicles: integer
-                  lastUpdated: datetime
-                  filters: object
-            example:
-              data:
-                - vehicleId: "TRUCK_001"
-                  driverId: "D001"
-                  driverName: "John Martinez"
-                  vehicleType: "Semi Truck"
-                  location: "New York"
-                  coordinates:
-                    latitude: 40.7128
-                    longitude: -74.0060
-                  telematicsData:
-                    speed: 65
-                    averageSpeed: 58
-                    brakingEvents: 2
-                    accelerationEvents: 1
-                    fuelEfficiency: 24.5
-                    engineStatus: "NORMAL"
-                    batteryLevel: 95
-                    tirePressure: "NORMAL"
-                    odometerReading: 87500
-                    engineHours: 1750
-                    lastGPSUpdate: "2025-06-09T20:00:00Z"
-                  driverMetrics:
-                    hoursOnDuty: 6.5
-                    milesThisShift: 420
-                    safetyScore: 8
-                    lastBreak: "2025-06-09T14:00:00Z"
-                    totalDrivingTime: "6 hours 30 minutes"
-                    speedingViolations: 0
-                    idleTime: "15 minutes"
-                  vehicleHealth:
-                    mileage: 87500
-                    lastServiceDate: "2025-05-15"
-                    nextServiceDue: 92500
-                    maintenanceStatus: "CURRENT"
-                    fuelLevel: 75
-                    engineTemp: 195
-                    oilPressure: "NORMAL"
-                    brakeStatus: "GOOD"
-                    transmissionStatus: "NORMAL"
-                  riskAssessment:
-                    riskScore: 3
-                    status: "LOW"
-                    coordinationRequired: false
-                    estimatedResponseTime: "Not required"
-                    riskFactors: []
-                    lastRiskAssessment: "2025-06-09T20:00:00Z"
-                    riskTrend: "STABLE"
-                  dataSource: "ChainSync Fleet Monitoring"
-                  timestamp: "2025-06-09T20:00:00Z"
-                  isRealTime: true
-              metadata:
-                totalVehicles: 6
-                recordsReturned: 6
-                page: 1
-                hasMore: false
-                riskSummary:
-                  criticalVehicles: 0
-                  highRiskVehicles: 1
-                  mediumRiskVehicles: 2
-                  lowRiskVehicles: 3
-                lastUpdated: "2025-06-09T20:00:00Z"
-                filters:
-                  vehicleId: null
-                  driverId: null
-                  location: null
-                  status: null
-                  minRiskScore: 0
+            type: AlertTypes.EnvironmentalEmergencyAlert
+            example: !include examples/EnvironmentalEmergencyAlertResponse.json
       400:
-        description: Bad request - invalid parameters
+        description: Invalid request or schema violation
         body:
           application/json:
-            type: ErrorResponse
-      500:
-        description: Internal server error
+            type: CommonTypes.ErrorResponse
+      401:
+        description: Unauthorized access — missing or invalid token
         body:
           application/json:
-            type: ErrorResponse
+            type: CommonTypes.ErrorResponse
 
-  /{vehicleId}:
-    displayName: Single Vehicle Monitoring
-    description: Detailed monitoring data for specific vehicle
-    uriParameters:
-      vehicleId:
-        type: string
-        description: Vehicle identifier
-        example: "TRUCK_001"
-    
-    get:
-      displayName: Get Vehicle Data
-      description: Get detailed monitoring data for specific vehicle
-      responses:
-        200:
-          description: Vehicle data retrieved successfully
-          body:
-            application/json:
-              type: VehicleData
-        404:
-          description: Vehicle not found
-          body:
-            application/json:
-              type: ErrorResponse
-              example:
-                error:
-                  code: "VEHICLE_NOT_FOUND"
-                  message: "Vehicle not found: TRUCK_999"
-                  timestamp: "2025-06-09T20:00:00Z"
-
-/fleet-alerts:
-  displayName: Fleet Emergency Alerts
-  description: Fleet alert management and emergency coordination
-  
-  get:
-    displayName: Get Fleet Alerts
-    description: |
-      Retrieve active fleet alerts including emergency conditions,
-      maintenance requirements, and driver safety issues.
-    is: [pageable]
-    queryParameters:
-      alertLevel?:
-        type: string
-        enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-        description: Filter by alert level
-      alertType?:
-        type: string
-        enum: ["EMERGENCY", "MAINTENANCE", "SAFETY", "COMPLIANCE", "MANUAL"]
-        description: Filter by alert type
-      vehicleId?:
-        type: string
-        description: Filter by vehicle ID
-    responses:
-      200:
-        description: Fleet alerts retrieved successfully
-        body:
-          application/json:
-            type: object
-            properties:
-              alerts: FleetAlert[]
-              summary:
-                type: object
-                properties:
-                  totalAlerts: integer
-                  criticalAlerts: integer
-                  highAlerts: integer
-                  mediumAlerts: integer
-                  vehiclesAffected: integer
-              timestamp: datetime
-            example:
-              alerts:
-                - alertId: "FLEET_ALERT_20250609_TRUCK_002"
-                  vehicleId: "TRUCK_002"
-                  driverId: "D002"
-                  driverName: "Sarah Johnson"
-                  alertType: "SAFETY"
-                  alertLevel: "HIGH"
-                  riskScore: 7
-                  triggerCondition: "Driver exceeded 8 hours of continuous driving"
-                  location: "Chicago, IL"
-                  coordinationWorkflow:
-                    workflowId: "FLEET_WF_20250609_002"
-                    meetingScheduled: true
-                    estimatedResponseTime: "2025-06-09T16:20:00Z"
-                    stakeholders: ["Fleet Manager", "Safety Coordinator", "Driver Support Team"]
-                    actionItems: ["Contact driver immediately", "Assess vehicle condition", "Schedule inspection"]
-                  slotifyIntegration:
-                    enabled: true
-                    endpoint: "https://slotify-engine/api/fleet-emergency-scheduling"
-                    schedulingWindow: "IMMEDIATE"
-                  createdAt: "2025-06-09T15:00:00Z"
-              summary:
-                totalAlerts: 1
-                criticalAlerts: 0
-                highAlerts: 1
-                mediumAlerts: 0
-                vehiclesAffected: 1
-              timestamp: "2025-06-09T20:00:00Z"
-
+/environmental-emergency-coordination/regulatory-reports:
   post:
-    displayName: Create Fleet Alert
-    description: |
-      Create a manual fleet alert for emergency situations or maintenance requirements.
-      Automatically triggers coordination workflows and Slotify scheduling.
+    is: [secured]
+    description: Submit a regulatory report to EPA, DEQ, or other authority
     body:
       application/json:
-        type: object
-        properties:
-          vehicleId: 
-            type: string
-            description: Vehicle identifier
-          driverId:
-            type: string
-            description: Driver identifier
-          alertType:
-            type: string
-            enum: ["EMERGENCY", "MAINTENANCE", "SAFETY", "COMPLIANCE", "MANUAL"]
-            default: "MANUAL"
-          alertLevel:
-            type: string
-            enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-          triggerCondition:
-            type: string
-            description: Reason for creating the alert
-          location?:
-            type: string
-            description: Current vehicle location
-        example:
-          vehicleId: "TRUCK_001"
-          driverId: "D001"
-          alertType: "EMERGENCY"
-          alertLevel: "CRITICAL"
-          triggerCondition: "Vehicle breakdown on highway"
-          location: "Interstate 95, Mile 45"
+        type: ComplianceTypes.RegulatoryComplianceReport
+        example: !include examples/RegulatoryComplianceReportRequest.json
     responses:
       201:
-        description: Fleet alert created successfully
         body:
           application/json:
-            type: FleetAlert
-
-/driver-performance:
-  displayName: Driver Performance Analytics
-  description: Driver performance metrics and analytics
-  
+            type: ComplianceTypes.RegulatoryComplianceReport
+            example: !include examples/RegulatoryComplianceReportResponse.json
+      400:
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
+      401:
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
+/regulatory-compliance:
   get:
-    displayName: Get Driver Performance
-    description: |
-      Retrieve driver performance analytics including safety scores,
-      fuel efficiency, and compliance metrics.
-    queryParameters:
-      driverId?:
-        type: string
-        description: Filter by driver ID
-        example: "D001"
-      period?:
-        type: string
-        enum: ["day", "week", "month", "quarter"]
-        default: "week"
-        description: Time period for performance analysis
+    is: [pageable,timeRange]
     responses:
       200:
-        description: Driver performance data retrieved successfully
         body:
           application/json:
-            type: object
-            properties:
-              period: string
-              driverPerformance: 
-                type: object
-                description: Driver performance data keyed by driver ID
-              summary:
-                type: object
-                properties:
-                  totalDrivers: integer
-                  excellentDrivers: integer
-                  riskDrivers: integer
-                  averageFleetSafetyScore: number
-                  averageFleetFuelEfficiency: number
-              timestamp: datetime
-            example:
-              period: "week"
-              driverPerformance:
-                D001:
-                  driverId: "D001"
-                  driverName: "John Martinez"
-                  vehicleCount: 1
-                  averageRiskScore: 3.2
-                  averageSafetyScore: 8.5
-                  totalMiles: 2150
-                  averageSpeed: 62.5
-                  totalBrakingEvents: 8
-                  averageFuelEfficiency: 24.2
-                  performanceRating: "EXCELLENT"
-                  riskLevel: "LOW"
-              summary:
-                totalDrivers: 6
-                excellentDrivers: 4
-                riskDrivers: 0
-                averageFleetSafetyScore: 7.8
-                averageFleetFuelEfficiency: 23.4
-              timestamp: "2025-06-09T20:00:00Z"
+            type: ComplianceTypes.RegulatoryComplianceReport[]
+            example: !include examples/RegulatoryComplianceReport.json
 
-# ==========================================
-# COMMON PLATFORM ENDPOINTS
-# ==========================================
+
+/environmental-data/{stationId}/readings:
+  uriParameters:
+    stationId:
+      type: string
+      example: "STATION_ATL_034"
+      description: Unique environmental monitoring station ID
+
+  post:
+    displayName: Submit Station Reading
+    description: Inject environmental readings into the data stream for the specified station
+    is: [secured]
+    body:
+      application/json:
+        type: StationReadingTypes.EnvironmentalStationReading
+        example: !include examples/EnvironmentalStationReadingRequest.json
+    responses:
+      200:
+        description: Reading accepted and integrated
+        body:
+          application/json:
+            type: StationReadingTypes.EnvironmentalStationReading
+            example: !include examples/EnvironmentalStationReadingResponse.json
+      400:
+        description: Malformed reading or station mismatch
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
+      401:
+        description: Unauthorized or invalid API key
+        body:
+          application/json:
+            type: CommonTypes.ErrorResponse
 
 /health:
-  displayName: Platform Health Check
-  description: Unified platform health monitoring and status
-  
+  displayName: Environmental Services Platform Health Check
+  description: Real-time health status for monitoring, coordination, and emergency response
+
   get:
-    displayName: Health Check
-    description: |
-      Check the health status of the entire ChainSync platform including environmental monitoring,
-      fleet management, and all external service dependencies.
+    displayName: Get Platform Health Status
+    description: Check the operational status of key systems across the platform
+    is: [timeRange]
     responses:
       200:
         description: Platform is healthy and operational
         body:
           application/json:
             type: object
-            properties:
-              status: 
-                type: string
-                enum: ["healthy", "degraded", "unhealthy"]
-              service: 
-                type: string
-                example: "ChainSync Unified Platform API"
-              version: 
-                type: string
-                example: "v1.0"
-              timestamp: 
-                type: datetime
-              services:
-                type: object
-                description: External service dependencies status
-                properties:
-                  openWeatherMap:
-                    type: object
-                    properties:
-                      status: string
-                      lastCheck: datetime
-                      responseTime: string
-                  airQualityAPI:
-                    type: object
-                    properties:
-                      status: string
-                      lastCheck: datetime
-                      responseTime: string
-                  fleetTelematicsAPI:
-                    type: object
-                    properties:
-                      status: string
-                      lastCheck: datetime
-                      responseTime: string
-                  vehicleDataProvider:
-                    type: object
-                    properties:
-                      status: string
-                      lastCheck: datetime
-                      responseTime: string
-                  slotifyCoordination:
-                    type: object
-                    properties:
-                      status: string
-                      lastCheck: datetime
-                      description: string
-              features:
-                type: object
-                description: Platform feature availability status
-                properties:
-                  environmentalMonitoring: string
-                  emergencyAlerts: string
-                  fleetMonitoring: string
-                  driverPerformance: string
-                  fleetAlerts: string
-                  coordinationWorkflows: string
-                  emergencyCoordination: string
-                  vehicleHealth: string
-              metrics:
-                type: object
-                description: Platform metrics and statistics
-                properties:
-                  activeStations: integer
-                  activeVehicles: integer
-                  activeDrivers: integer
-                  monitoringCoverage: string
-                  totalAlerts: integer
-            example:
-              status: "healthy"
-              service: "ChainSync Unified Platform API"
-              version: "v1.0"
-              timestamp: "2025-06-09T20:00:00Z"
-              services:
-                openWeatherMap:
-                  status: "available"
-                  lastCheck: "2025-06-09T20:00:00Z"
-                  responseTime: "< 500ms"
-                airQualityAPI:
-                  status: "available"
-                  lastCheck: "2025-06-09T20:00:00Z"
-                  responseTime: "< 300ms"
-                fleetTelematicsAPI:
-                  status: "available"
-                  lastCheck: "2025-06-09T20:00:00Z"
-                  responseTime: "< 200ms"
-                vehicleDataProvider:
-                  status: "available"
-                  lastCheck: "2025-06-09T20:00:00Z"
-                  responseTime: "< 150ms"
-                slotifyCoordination:
-                  status: "ready"
-                  lastCheck: "2025-06-09T20:00:00Z"
-                  description: "Ready to trigger Slotify emergency scheduling"
-              features:
-                environmentalMonitoring: "active"
-                emergencyAlerts: "active"
-                fleetMonitoring: "active"
-                driverPerformance: "active"
-                fleetAlerts: "active"
-                coordinationWorkflows: "ready"
-                emergencyCoordination: "ready"
-                vehicleHealth: "active"
-              metrics:
-                activeStations: 6
-                activeVehicles: 6
-                activeDrivers: 6
-                monitoringCoverage: "100%"
-                totalAlerts: 2
+            example: !include /examples/PlatformHealth.json
       503:
         description: Platform is experiencing issues
         body:
           application/json:
-            type: ErrorResponse
+            type: CommonTypes.ErrorResponse
+            example:
+              error:
+                code: "PLATFORM_DOWN"
+                message: "ChainSync platform is reporting degraded performance"
+                timestamp: "2025-07-09T20:00:00Z"

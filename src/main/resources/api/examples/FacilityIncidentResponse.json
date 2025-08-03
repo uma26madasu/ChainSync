@@ -1,0 +1,17 @@
+{
+  "incidentId": "INC_20250720_001",
+  "facilityId": "VEOLIA_WTP_NYC_001",
+  "incidentType": "CONTAMINATION_BREACH",
+  "severity": "HIGH",
+  "description": "Chlorine over-injection exceeded safety threshold. Workers evacuated.",
+  "reportedBy": "UMA.MADASU",
+  "timestamp": "2025-07-20T10:15:00Z",
+  "containmentActions": [
+    "Shut down chlorine pumps",
+    "Isolated affected pipeline",
+    "Notified EPA and NYC water authority"
+  ],
+  "status": "UNDER_INVESTIGATION",
+  "reviewStatus": "ACKNOWLEDGED",
+  "assignedTeam": "IncidentOps_NYC"
+}

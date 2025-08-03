@@ -1,0 +1,13 @@
+#%RAML 1.0 Trait
+
+usage: Filters results by timestamp range
+
+queryParameters:
+  startTime?:
+    type: datetime
+    description: Start time for filtering
+    example: "2025-07-01T00:00:00Z"
+  endTime?:
+    type: datetime
+    description: End time for filtering
+    example: "2025-07-10T23:59:00Z"

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Vehicle Dispatch Flow -->
+    <flow name="post:\environmental-service-vehicles\(vehicleId)\dispatch:application\json:chainsync-platform-api-config" doc:name="Dispatch Environmental Service Vehicle">
+        <ee:transform doc:name="Extract Dispatch Request">
+            <ee:variables>
+                <ee:set-variable variableName="vehicleId">attributes.uriParams.'vehicleId'</ee:set-variable>
+                <ee:set-variable variableName="dispatchId">payload.dispatchId</ee:set-variable>
+                <ee:set-variable variableName="taskType">payload.taskType</ee:set-variable>
+                <ee:set-variable variableName="priority">payload.priority</ee:set-variable>
+                <ee:set-variable variableName="destination">payload.destination</ee:set-variable>
+                <ee:set-variable variableName="dispatchWindow">payload.dispatchWindow</ee:set-variable>
+                <ee:set-variable variableName="notes">payload.notes default ""</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Validate vehicle exists and is available -->
+        <flow-ref name="get:\environmental-service-vehicles\(vehicleId):chainsync-platform-api-config" doc:name="Check Vehicle Availability"/>
+        
+        <choice doc:name="Validate Vehicle and Dispatch">
+            <when expression="#[payload.error?]">
+                <!-- Vehicle not found -->
+                <ee:transform doc:name="Vehicle Not Found for Dispatch">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "VEHICLE_NOT_FOUND",
+        message: "Cannot dispatch vehicle: " ++ vars.vehicleId ++ " - vehicle not found",
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <when expression="#[payload.emergencyCapability.availabilityStatus != 'AVAILABLE']">
+                <!-- Vehicle not available -->
+                <ee:transform doc:name="Vehicle Not Available">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "VEHICLE_UNAVAILABLE",
+        message: "Vehicle " ++ vars.vehicleId ++ " is not available for dispatch. Status: " ++ payload.emergencyCapability.availabilityStatus,
+        details: "Vehicle must be in AVAILABLE status for dispatch",
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">409</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Process dispatch -->
+                <ee:transform doc:name="Process Vehicle Dispatch">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Calculate estimated arrival time based on priority and distance
+fun calculateETA(priority: String, currentTime: DateTime) = 
+    if (priority == "URGENT") currentTime + |PT15M|
+    else if (priority == "HIGH") currentTime + |PT30M|
+    else if (priority == "MEDIUM") currentTime + |PT45M|
+    else currentTime + |PT60M|
+
+// Generate tracking URL
+fun generateTrackingURL(vehicleId: String) = 
+    "https://tracking.chainsync.io/vehicle/" ++ vehicleId
+
+// Generate dispatch response message
+fun generateDispatchMessage(taskType: String, priority: String) = 
+    "Vehicle dispatched successfully for " ++ taskType ++ " with " ++ priority ++ " priority and is en route to destination."
+
+---
+{
+    dispatchId: vars.dispatchId,
+    vehicleId: vars.vehicleId,
+    status: "IN_TRANSIT",
+    estimatedArrival: calculateETA(vars.priority, now()) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    lastUpdate: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    trackingURL: generateTrackingURL(vars.vehicleId),
+    message: generateDispatchMessage(vars.taskType, vars.priority),
+    dispatchDetails: {
+        taskType: vars.taskType,
+        priority: vars.priority,
+        destination: vars.destination,
+        dispatchWindow: vars.dispatchWindow,
+        notes: vars.notes,
+        dispatchedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+        expectedCompletion: calculateETA(vars.priority, now()) + |PT2H| as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    },
+    coordinationWorkflow: {
+        workflowTriggered: vars.priority == "URGENT" or vars.priority == "HIGH",
+        slotifyIntegration: if (vars.priority == "URGENT") {
+            enabled: true,
+            meetingScheduled: true,
+            coordinatingAgencies: ["Environmental Response Team", "Emergency Services", "Facility Management"]
+        } else {
+            enabled: false,
+            meetingScheduled: false
+        }
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                
+                <!-- Log dispatch action -->
+                <logger level="INFO" message="Vehicle dispatched: #[vars.vehicleId] for #[vars.taskType] with #[vars.priority] priority" doc:name="Log Dispatch"/>
+                
+                <!-- Trigger coordination workflow if high priority -->
+                <choice doc:name="Trigger Coordination if Needed">
+                    <when expression="#[vars.priority == 'URGENT' or vars.priority == 'HIGH']">
+                        <logger level="WARN" message="High priority dispatch - triggering coordination workflow for vehicle #[vars.vehicleId]" doc:name="Log Coordination Trigger"/>
+                        <!-- Here you would integrate with Slotify or other coordination systems -->
+                    </when>
+                    <otherwise>
+                        <logger level="INFO" message="Standard dispatch - no coordination workflow needed" doc:name="Log Standard Dispatch"/>
+                    </otherwise>
+                </choice>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

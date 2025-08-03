@@ -11,7 +11,6 @@
         http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
-
     <!-- Import global configuration first -->
     <import file="global.xml" doc:name="Import Global Configurations"/>
     
@@ -20,12 +19,14 @@
     <import file="environmental-data-integration.xml" doc:name="Import Environmental Data Integration"/>
     <import file="error-handling.xml" doc:name="Import Error Handling"/>
     
-    <!-- Import fleet monitoring and coordination -->
-    <import file="fleet-monitoring-api.xml" doc:name="Import Fleet Monitoring Implementation"/>
-    <import file="environmental-data-system-api.xml" doc:name="Import Environmental Data System API"/>
-    <import file="fleet-environmental-coordination.xml" doc:name="Import Fleet Environmental Coordination"/>
+    <!-- Import existing implementations -->
+    <import file="environmental-data-impl.xml" doc:name="Import Environmental Data Implementation"/>
     
-    <!-- APIkit Configuration -->
+    <!-- Import new Phase 1 implementations -->
+    <import file="environmental-facilities-impl.xml" doc:name="Import Environmental Facilities Implementation"/>
+    <import file="environmental-station-readings-impl.xml" doc:name="Import Station Readings Implementation"/>
+
+    <!-- APIkit Configuration with updated RAML -->
     <apikit:config name="chainsync-platform-api-config" api="api/chainsync-platform-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus"/>
 
     <!-- Main API Flow -->
@@ -41,7 +42,6 @@
         </http:listener>
 
         <apikit:router config-ref="chainsync-platform-api-config" doc:name="APIkit Router"/>
-        <!--  <error-handler ref="Global_Error_Handler"/>-->
     </flow>
 
     <!-- Console Flow -->

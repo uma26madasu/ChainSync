@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Facility Incident Reporting -->
+    <flow name="post:\environmental-facilities\(facilityId)\incidents:application\json:chainsync-platform-api-config" doc:name="Report Facility Incident">
+        <ee:transform doc:name="Extract Incident Request">
+            <ee:variables>
+                <ee:set-variable variableName="facilityId">attributes.uriParams.'facilityId'</ee:set-variable>
+                <ee:set-variable variableName="incidentId">payload.incidentId</ee:set-variable>
+                <ee:set-variable variableName="incidentType">payload.incidentType</ee:set-variable>
+                <ee:set-variable variableName="severity">payload.severity</ee:set-variable>
+                <ee:set-variable variableName="description">payload.description</ee:set-variable>
+                <ee:set-variable variableName="reportedBy">payload.reportedBy</ee:set-variable>
+                <ee:set-variable variableName="containmentActions">payload.containmentActions</ee:set-variable>
+                <ee:set-variable variableName="incidentTimestamp">payload.timestamp default now()</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Validate facility exists -->
+        <flow-ref name="get:\environmental-facilities\(facilityId):chainsync-platform-api-config" doc:name="Validate Facility"/>
+        
+        <choice doc:name="Process Incident Report">
+            <when expression="#[payload.error?]">
+                <!-- Facility not found -->
+                <ee:transform doc:name="Facility Not Found for Incident">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "FACILITY_NOT_FOUND",
+        message: "Cannot report incident: facility " ++ vars.facilityId ++ " not found",
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Process the incident report -->
+                <ee:transform doc:name="Process Facility Incident Report">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper function to determine review status based on severity
+fun determineReviewStatus(severity: String) = 
+    if (severity == "CRITICAL") "IMMEDIATE_REVIEW"
+    else if (severity == "HIGH") "URGENT_REVIEW"
+    else "ACKNOWLEDGED"
+
+// Helper function to assign response team based on incident type
+fun assignResponseTeam(incidentType: String, severity: String) = 
+    if (incidentType == "CONTAMINATION_BREACH") "HazMat_Response_Team"
+    else if (incidentType == "EQUIPMENT_FAILURE" and severity == "CRITICAL") "Emergency_Engineering_Team"
+    else if (incidentType == "SAFETY_VIOLATION") "Safety_Compliance_Team"
+    else "Facility_Operations_Team"
+
+// Helper function to determine if incident requires emergency coordination
+fun requiresEmergencyCoordination(severity: String, incidentType: String) = 
+    severity == "CRITICAL" or 
+    (severity == "HIGH" and incidentType == "CONTAMINATION_BREACH")
+
+// Helper function to generate immediate response actions
+fun generateImmediateActions(incidentType: String, severity: String) = 
+    if (incidentType == "CONTAMINATION_BREACH") [
+        "Isolate contamination source",
+        "Activate emergency protocols",
+        "Notify regulatory agencies",
+        "Begin decontamination procedures"
+    ]
+    else if (incidentType == "EQUIPMENT_FAILURE" and severity == "CRITICAL") [
+        "Shutdown affected systems",
+        "Activate backup systems",
+        "Deploy emergency repair team",
+        "Monitor safety parameters"
+    ]
+    else if (incidentType == "SAFETY_VIOLATION") [
+        "Ensure personnel safety",
+        "Document violation details",
+        "Implement corrective measures",
+        "Review safety protocols"
+    ]
+    else [
+        "Assess situation",
+        "Document incident details",
+        "Implement standard response",
+        "Monitor for escalation"
+    ]
+
+---
+{
+    incidentId: vars.incidentId,
+    facilityId: vars.facilityId,
+    facilityName: payload.facilityName,
+    incidentType: vars.incidentType,
+    severity: vars.severity,
+    description: vars.description,
+    reportedBy: vars.reportedBy,
+    timestamp: vars.incidentTimestamp as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    containmentActions: vars.containmentActions,
+    status: "UNDER_INVESTIGATION",
+    reviewStatus: determineReviewStatus(vars.severity),
+    assignedTeam: assignResponseTeam(vars.incidentType, vars.severity),
+    
+    // Incident response workflow
+    responseWorkflow: {
+        workflowId: "INC_WF_" ++ now() as String {format: "yyyyMMdd_HHmmss"},
+        emergencyCoordinationRequired: requiresEmergencyCoordination(vars.severity, vars.incidentType),
+        immediateActions: generateImmediateActions(vars.incidentType, vars.severity),
+        responseTeam: assignResponseTeam(vars.incidentType, vars.severity),
+        estimatedResponseTime: if (vars.severity == "CRITICAL") "15 minutes"
+                              else if (vars.severity == "HIGH") "30 minutes"
+                              else "2 hours",
+        coordinationMeeting: {
+            required: requiresEmergencyCoordination(vars.severity, vars.incidentType),
+            scheduledTime: if (requiresEmergencyCoordination(vars.severity, vars.incidentType))
+                           (now() + |PT15M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+                           else null,
+            stakeholders: if (vars.severity == "CRITICAL") [
+                "Facility Manager",
+                "Environmental Compliance Officer",
+                "Emergency Response Team",
+                "Regulatory Liaisons",
+                "Safety Coordinator"
+            ] else [
+                "Facility Manager", 
+                "Incident Response Team",
+                "Compliance Officer"
+            ]
+        }
+    },
+    
+    // Regulatory notification requirements  
+    regulatoryNotification: {
+        required: vars.severity == "CRITICAL" or vars.incidentType == "CONTAMINATION_BREACH",
+        agencies: if (vars.severity == "CRITICAL") [
+            "EPA Regional Office",
+            "State Environmental Agency",
+            "Local Emergency Management",
+            "OSHA (if safety incident)"
+        ] else if (vars.incidentType == "CONTAMINATION_BREACH") [
+            "EPA Regional Office",
+            "State Environmental Agency"
+        ] else [],
+        notificationDeadline: if (vars.severity == "CRITICAL") 
+                             (now() + |PT1H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+                             else if (vars.incidentType == "CONTAMINATION_BREACH")
+                             (now() + |PT4H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+                             else null,
+        reportingStatus: "PENDING"
+    },
+    
+    // Slotify integration for coordination
+    slotifyIntegration: {
+        enabled: requiresEmergencyCoordination(vars.severity, vars.incidentType),
+        endpoint: "https://slotify.io/incident-coordination",
+        meetingRoom: "Incident Command Center",
+        emergencyScheduling: vars.severity == "CRITICAL",
+        coordinationType: if (vars.severity == "CRITICAL") "EMERGENCY_RESPONSE"
+                         else if (vars.severity == "HIGH") "URGENT_COORDINATION"
+                         else "STANDARD_REVIEW"
+    },
+    
+    // Follow-up requirements
+    followUpActions: {
+        investigationRequired: true,
+        rootCauseAnalysis: vars.severity == "CRITICAL" or vars.severity == "HIGH",
+        complianceReview: vars.incidentType == "SAFETY_VIOLATION" or vars.incidentType == "CONTAMINATION_BREACH",
+        systemUpdates: vars.incidentType == "EQUIPMENT_FAILURE",
+        trainingRequired: vars.incidentType == "SAFETY_VIOLATION",
+        estimatedResolutionTime: if (vars.severity == "CRITICAL") "24-48 hours"
+                                 else if (vars.severity == "HIGH") "3-5 days"
+                                 else "1-2 weeks"
+    },
+    
+    createdAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                
+                <!-- Log incident report -->
+                <logger level="WARN" message="Facility incident reported: #[vars.facilityId] - #[vars.severity] - #[vars.incidentType] - #[vars.incidentId]" doc:name="Log Incident Report"/>
+                
+                <!-- Trigger emergency coordination if needed -->
+                <choice doc:name="Trigger Emergency Response">
+                    <when expression="#[vars.severity == 'CRITICAL' or (vars.severity == 'HIGH' and vars.incidentType == 'CONTAMINATION_BREACH')]">
+                        <logger level="ERROR" message="CRITICAL incident - triggering emergency coordination for facility #[vars.facilityId]" doc:name="Log Emergency Response"/>
+                        <!-- Here you would integrate with emergency response systems -->
+                    </when>
+                    <otherwise>
+                        <logger level="INFO" message="Standard incident processing - assigned to #[assignResponseTeam(vars.incidentType, vars.severity)]" doc:name="Log Standard Processing"/>
+                    </otherwise>
+                </choice>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

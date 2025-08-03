@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Environmental Facilities List Flow -->
+    <flow name="get:\environmental-facilities:chainsync-platform-api-config" doc:name="Get Environmental Facilities">
+        <!-- Get existing environmental data -->
+        <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Environmental Data"/>
+        
+        <!-- Transform stations into facilities -->
+        <ee:transform doc:name="Transform Stations to Facilities">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper function to determine facility type based on station data
+fun determineFacilityType(station) = 
+    if (station.airQuality.aqi > 100) "MONITORING_STATION"
+    else if (station.weather.visibility < 10) "WEATHER_STATION" 
+    else "ENVIRONMENTAL_FACILITY"
+
+// Helper function to map operational status
+fun getOperationalStatus(station) = {
+    operationMode: if (station.riskAssessment.coordinationRequired) "ALERT" else "NORMAL",
+    equipmentStatus: "OPTIMAL",
+    processingEfficiency: if (station.airQuality.aqi < 50) 98.5 
+                         else if (station.airQuality.aqi < 100) 95.0
+                         else 90.0,
+    backupSystems: ["Emergency Sensors", "Backup Communication"]
+}
+
+// Helper function to determine compliance status
+fun getComplianceStatus(station) = {
+    epaCompliant: station.airQuality.aqi < 150,
+    stateCompliant: station.airQuality.aqi < 100,
+    localCompliant: station.airQuality.aqi < 50,
+    lastViolation: if (station.airQuality.aqi > 150) "2024-11-05" else null,
+    nextInspection: "2025-08-15"
+}
+
+---
+{
+    data: payload.data map {
+        facilityId: $.stationId replace "CENTRAL" with "FAC",
+        facilityName: $.city ++ " Environmental Monitoring Facility",
+        facilityType: determineFacilityType($),
+        operationalCapacity: "Real-time environmental monitoring",
+        location: $.city ++ ", " ++ $.country,
+        coordinates: $.coordinates,
+        environmentalParameters: {
+            airQuality: {
+                aqi: $.airQuality.aqi,
+                level: $.airQuality.level,
+                pollutants: $.airQuality.pollutants
+            },
+            weather: {
+                temperature: $.weather.temperature,
+                humidity: $.weather.humidity,
+                pressure: $.weather.pressure,
+                windSpeed: $.weather.windSpeed,
+                visibility: $.weather.visibility,
+                condition: $.weather.condition
+            }
+        },
+        operationalStatus: getOperationalStatus($),
+        complianceStatus: getComplianceStatus($),
+        riskAssessment: {
+            environmentalRiskScore: $.riskAssessment.riskScore,
+            regulatoryRisk: if ($.airQuality.aqi > 100) "HIGH" else "LOW",
+            publicHealthRisk: $.riskAssessment.emergencyLevel,
+            emergencyCoordinationRequired: $.riskAssessment.coordinationRequired,
+            estimatedResponseTime: $.riskAssessment.estimatedResponseTime
+        },
+        emergencyContacts: {
+            facilityManager: "Environmental Manager",
+            environmentalCompliance: "Compliance Officer", 
+            emergencyCoordinator: "Emergency Response Team"
+        },
+        dataSource: $.dataSource,
+        timestamp: $.timestamp,
+        isRealTime: $.isRealTime
+    },
+    metadata: {
+        totalFacilities: sizeOf(payload.data),
+        recordsReturned: sizeOf(payload.data),
+        page: 1,
+        hasMore: false,
+        riskSummary: {
+            criticalFacilities: sizeOf(payload.data filter ($.riskAssessment.riskScore >= 8)),
+            highRiskFacilities: sizeOf(payload.data filter ($.riskAssessment.riskScore >= 6 and $.riskAssessment.riskScore < 8)),
+            mediumRiskFacilities: sizeOf(payload.data filter ($.riskAssessment.riskScore >= 4 and $.riskAssessment.riskScore < 6)),
+            lowRiskFacilities: sizeOf(payload.data filter ($.riskAssessment.riskScore < 4))
+        },
+        lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+        filters: {
+            facilityType: null,
+            complianceStatus: null,
+            location: null
+        }
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Single Environmental Facility Flow -->
+    <flow name="get:\environmental-facilities\(facilityId):chainsync-platform-api-config" doc:name="Get Single Environmental Facility">
+        <ee:transform doc:name="Extract Facility ID">
+            <ee:variables>
+                <ee:set-variable variableName="facilityId">attributes.uriParams.'facilityId'</ee:set-variable>
+                <!-- Convert facility ID back to station ID -->
+                <ee:set-variable variableName="stationId">vars.facilityId replace "FAC" with "CENTRAL"</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Get single station data -->
+        <flow-ref name="get:\environmental-data\(stationId):chainsync-platform-api-config" doc:name="Get Station Data"/>
+        
+        <!-- Check if station was found -->
+        <choice doc:name="Check Station Response">
+            <when expression="#[payload.error?]">
+                <!-- Station not found, return facility not found -->
+                <ee:transform doc:name="Facility Not Found">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "FACILITY_NOT_FOUND",
+        message: "Environmental facility not found: " ++ vars.facilityId,
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Transform single station to facility -->
+                <ee:transform doc:name="Transform Single Station to Facility">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper functions (same as above)
+fun determineFacilityType(station) = 
+    if (station.airQuality.aqi > 100) "MONITORING_STATION"
+    else if (station.weather.visibility < 10) "WEATHER_STATION" 
+    else "ENVIRONMENTAL_FACILITY"
+
+fun getOperationalStatus(station) = {
+    operationMode: if (station.riskAssessment.coordinationRequired) "ALERT" else "NORMAL",
+    equipmentStatus: "OPTIMAL", 
+    processingEfficiency: if (station.airQuality.aqi < 50) 98.5 
+                         else if (station.airQuality.aqi < 100) 95.0
+                         else 90.0,
+    backupSystems: ["Emergency Sensors", "Backup Communication"]
+}
+
+fun getComplianceStatus(station) = {
+    epaCompliant: station.airQuality.aqi < 150,
+    stateCompliant: station.airQuality.aqi < 100, 
+    localCompliant: station.airQuality.aqi < 50,
+    lastViolation: if (station.airQuality.aqi > 150) "2024-11-05" else null,
+    nextInspection: "2025-08-15"
+}
+
+---
+{
+    facilityId: vars.facilityId,
+    facilityName: payload.city ++ " Environmental Monitoring Facility",
+    facilityType: determineFacilityType(payload),
+    operationalCapacity: "Real-time environmental monitoring",
+    location: payload.city ++ ", " ++ payload.country,
+    coordinates: payload.coordinates,
+    environmentalParameters: {
+        airQuality: {
+            aqi: payload.airQuality.aqi,
+            level: payload.airQuality.level, 
+            pollutants: payload.airQuality.pollutants
+        },
+        weather: {
+            temperature: payload.weather.temperature,
+            humidity: payload.weather.humidity,
+            pressure: payload.weather.pressure,
+            windSpeed: payload.weather.windSpeed,
+            visibility: payload.weather.visibility,
+            condition: payload.weather.condition
+        }
+    },
+    operationalStatus: getOperationalStatus(payload),
+    complianceStatus: getComplianceStatus(payload),
+    riskAssessment: {
+        environmentalRiskScore: payload.riskAssessment.riskScore,
+        regulatoryRisk: if (payload.airQuality.aqi > 100) "HIGH" else "LOW",
+        publicHealthRisk: payload.riskAssessment.emergencyLevel,
+        emergencyCoordinationRequired: payload.riskAssessment.coordinationRequired,
+        estimatedResponseTime: payload.riskAssessment.estimatedResponseTime
+    },
+    emergencyContacts: {
+        facilityManager: "Environmental Manager",
+        environmentalCompliance: "Compliance Officer",
+        emergencyCoordinator: "Emergency Response Team"
+    },
+    dataSource: payload.dataSource,
+    timestamp: payload.timestamp,
+    isRealTime: payload.isRealTime
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Environmental Emergency Alerts List - Maps from your existing emergency-alerts -->
+    <flow name="get:\environmental-emergency-alerts:chainsync-platform-api-config" doc:name="Get Environmental Emergency Alerts">
+        <!-- Get environmental data to check for emergency conditions -->
+        <flow-ref name="get:\environmental-data:chainsync-platform-api-config" doc:name="Get Environmental Data"/>
+        
+        <ee:transform doc:name="Generate Environmental Emergency Alerts">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper function to determine alert level based on risk score
+fun determineAlertLevel(riskScore: Number) = 
+    if (riskScore >= 8) "CRITICAL"
+    else if (riskScore >= 6) "EMERGENCY" 
+    else "WARNING"
+
+// Helper function to generate alert trigger condition
+fun generateTriggerCondition(station) = 
+    if (station.airQuality.aqi > 200) "AQI exceeded 200 (Very Unhealthy threshold)"
+    else if (station.airQuality.aqi > 150) "AQI exceeded 150 (Unhealthy threshold)"
+    else if (station.weather.visibility < 3) "Visibility dropped below 3km"
+    else if (station.riskAssessment.riskScore >= 8) "Critical environmental conditions detected"
+    else "Environmental threshold exceeded"
+
+// Helper function to get coordination stakeholders
+fun getCoordinationStakeholders(alertLevel: String, location: String) = 
+    if (alertLevel == "CRITICAL") [
+        "EPA Emergency Response Team",
+        "State Environmental Agency",
+        "Local Emergency Management",
+        "Public Health Department",
+        location ++ " Environmental Services"
+    ]
+    else if (alertLevel == "EMERGENCY") [
+        "Environmental Response Team",
+        "Public Health Officials", 
+        "Emergency Services"
+    ]
+    else [
+        "Environmental Monitoring Team",
+        "Facility Management"
+    ]
+
+// Helper function to generate action items based on alert type
+fun generateActionItems(station, alertLevel: String) = 
+    if (alertLevel == "CRITICAL") [
+        "Issue public health advisory immediately",
+        "Activate emergency response protocol",
+        "Notify vulnerable population centers",
+        "Deploy emergency environmental services",
+        "Coordinate with " ++ station.city ++ " emergency services"
+    ]
+    else if (alertLevel == "EMERGENCY") [
+        "Monitor conditions closely",
+        "Prepare public notifications",
+        "Alert environmental response teams",
+        "Check backup monitoring systems"
+    ]
+    else [
+        "Continue monitoring",
+        "Review threshold settings",
+        "Check equipment calibration"
+    ]
+
+// Filter stations that need emergency alerts (risk score >= 5)
+var alertStations = payload.data filter ($.riskAssessment.riskScore >= 5)
+
+---
+{
+    alerts: alertStations map {
+        alertId: "ENV_ALERT_" ++ $.stationId ++ "_" ++ now() as String {format: "yyyyMMdd_HHmmss"},
+        facilityId: $.stationId replace "CENTRAL" with "FAC", // Map to facility ID
+        facilityName: $.city ++ " Environmental Monitoring Facility",
+        emergencyType: if ($.airQuality.aqi > 150) "CONTAMINATION_EVENT"
+                      else if ($.weather.visibility < 5) "WEATHER_EMERGENCY"
+                      else "ENVIRONMENTAL_EXCEEDANCE",
+        alertLevel: determineAlertLevel($.riskAssessment.riskScore),
+        environmentalRiskScore: $.riskAssessment.riskScore,
+        affectedPopulation: if ($.city == "New York") 125000
+                           else if ($.city == "London") 200000
+                           else if ($.city == "Beijing") 300000
+                           else 50000,
+        triggerCondition: generateTriggerCondition($),
+        publicHealthImpact: {
+            healthRisk: if ($.riskAssessment.riskScore >= 8) "HIGH"
+                       else if ($.riskAssessment.riskScore >= 6) "MEDIUM"
+                       else "LOW",
+            vulnerablePopulations: [
+                "Children under 5",
+                "Elderly residents",
+                "Individuals with respiratory conditions"
+            ],
+            recommendedActions: if ($.airQuality.aqi > 150) [
+                "Stay indoors",
+                "Use air purifiers",
+                "Avoid outdoor exercise",
+                "Seek medical attention if symptoms occur"
+            ] else [
+                "Limit outdoor activities",
+                "Monitor air quality updates"
+            ]
+        },
+        regulatoryCoordination: {
+            agenciesNotified: [
+                "EPA Region " ++ (if ($.city == "New York") "2" else "1"),
+                "State Environmental Department",
+                "Local Emergency Management"
+            ],
+            reportingRequirements: [
+                {
+                    agency: "EPA",
+                    requirement: "Immediate notification within 1 hour",
+                    deadline: (now() + |PT1H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+                    status: "PENDING"
+                }
+            ]
+        },
+        emergencyCoordinationWorkflow: {
+            workflowId: "ENV_WF_" ++ now() as String {format: "yyyyMMdd_HHmmss"},
+            multiAgencyMeetingScheduled: $.riskAssessment.coordinationRequired,
+            estimatedMeetingTime: if ($.riskAssessment.coordinationRequired) 
+                                  (now() + |PT30M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+                                  else null,
+            coordinatingAgencies: getCoordinationStakeholders(determineAlertLevel($.riskAssessment.riskScore), $.city),
+            emergencyActionItems: generateActionItems($, determineAlertLevel($.riskAssessment.riskScore)),
+            slotifyIntegration: {
+                schedulingEnabled: $.riskAssessment.coordinationRequired,
+                meetingRoom: "Environmental Ops Center",
+                videoConference: "https://slotify.io/env-meet-" ++ now() as String {format: "yyyyMMddHHmmss"},
+                participantNotifications: $.riskAssessment.coordinationRequired
+            }
+        },
+        publicNotification: {
+            publicAlertIssued: $.riskAssessment.riskScore >= 7,
+            notificationChannels: if ($.riskAssessment.riskScore >= 7) [
+                "Emergency Alert System",
+                "Local Media",
+                "Social Media",
+                "Municipal Website",
+                "Mobile Push Notifications"
+            ] else [
+                "Environmental Monitoring Website",
+                "Email Subscribers"
+            ],
+            affectedAreas: [
+                $.city ++ " Downtown",
+                $.city ++ " Residential Areas",
+                $.city ++ " Industrial Zone"
+            ],
+            communityResources: if ($.riskAssessment.riskScore >= 7) [
+                "Emergency shelters with air filtration",
+                "Community health centers",
+                "Environmental information hotline"
+            ] else []
+        },
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    },
+    summary: {
+        totalAlerts: sizeOf(alertStations),
+        criticalAlerts: sizeOf(alertStations filter ($.riskAssessment.riskScore >= 8)),
+        emergencyAlerts: sizeOf(alertStations filter ($.riskAssessment.riskScore >= 6 and $.riskAssessment.riskScore < 8)),
+        warningAlerts: sizeOf(alertStations filter ($.riskAssessment.riskScore >= 5 and $.riskAssessment.riskScore < 6)),
+        facilitiesAffected: sizeOf(alertStations),
+        coordinationMeetingsScheduled: sizeOf(alertStations filter ($.riskAssessment.coordinationRequired))
+    },
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Create Environmental Emergency Alert -->
+    <flow name="post:\environmental-emergency-alerts:application\json:chainsync-platform-api-config" doc:name="Create Environmental Emergency Alert">
+        <ee:transform doc:name="Extract Alert Request">
+            <ee:variables>
+                <ee:set-variable variableName="facilityId">payload.facilityId</ee:set-variable>
+                <ee:set-variable variableName="emergencyType">payload.emergencyType</ee:set-variable>
+                <ee:set-variable variableName="alertLevel">payload.alertLevel</ee:set-variable>
+                <ee:set-variable variableName="triggerCondition">payload.triggerCondition</ee:set-variable>
+                <ee:set-variable variableName="overrideReason">payload.overrideReason default ""</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Validate facility exists -->
+        <flow-ref name="get:\environmental-facilities\(facilityId):chainsync-platform-api-config" doc:name="Validate Facility"/>
+        
+        <choice doc:name="Process Alert Creation">
+            <when expression="#[payload.error?]">
+                <!-- Facility not found -->
+                <ee:transform doc:name="Facility Not Found for Alert">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "FACILITY_NOT_FOUND",
+        message: "Cannot create alert: facility " ++ vars.facilityId ++ " not found",
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Create the alert -->
+                <ee:transform doc:name="Create Environmental Emergency Alert">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper function to determine coordination requirements
+fun requiresCoordination(alertLevel: String) = 
+    alertLevel == "CRITICAL" or alertLevel == "EMERGENCY"
+
+// Helper function to estimate affected population
+fun estimateAffectedPopulation(location: String) = 
+    if (location contains "New York") 125000
+    else if (location contains "London") 200000  
+    else if (location contains "Beijing") 300000
+    else 50000
+
+---
+{
+    alertId: "ENV_ALERT_" ++ vars.facilityId ++ "_" ++ now() as String {format: "yyyyMMdd_HHmmss"},
+    facilityId: vars.facilityId,
+    facilityName: payload.facilityName,
+    emergencyType: vars.emergencyType,
+    alertLevel: vars.alertLevel,
+    environmentalRiskScore: if (vars.alertLevel == "CRITICAL") 9
+                           else if (vars.alertLevel == "EMERGENCY") 7
+                           else 5,
+    affectedPopulation: estimateAffectedPopulation(payload.location),
+    triggerCondition: vars.triggerCondition,
+    overrideReason: vars.overrideReason,
+    publicHealthImpact: {
+        healthRisk: if (vars.alertLevel == "CRITICAL") "HIGH"
+                   else if (vars.alertLevel == "EMERGENCY") "MEDIUM"
+                   else "LOW",
+        vulnerablePopulations: [
+            "Children under 5",
+            "Elderly residents", 
+            "Immunocompromised individuals"
+        ],
+        recommendedActions: if (vars.emergencyType == "WATER_QUALITY_EXCEEDANCE") [
+            "Boil water before consumption",
+            "Use bottled water for drinking",
+            "Seek medical attention if symptoms occur"
+        ] else [
+            "Stay indoors when possible",
+            "Monitor health symptoms",
+            "Follow official guidance"
+        ]
+    },
+    regulatoryCoordination: {
+        agenciesNotified: [
+            "EPA Regional Office",
+            "State Environmental Department",
+            "Local Emergency Management",
+            "Public Health Department"
+        ],
+        reportingRequirements: [
+            {
+                agency: "EPA",
+                requirement: "Immediate notification within 1 hour",
+                deadline: (now() + |PT1H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+                status: "SUBMITTED"
+            }
+        ]
+    },
+    emergencyCoordinationWorkflow: {
+        workflowId: "ENV_WF_" ++ now() as String {format: "yyyyMMdd_HHmmss"},
+        multiAgencyMeetingScheduled: requiresCoordination(vars.alertLevel),
+        estimatedMeetingTime: if (requiresCoordination(vars.alertLevel))
+                              (now() + |PT30M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+                              else null,
+        coordinatingAgencies: if (vars.alertLevel == "CRITICAL") [
+            "EPA Emergency Response Team",
+            "State Environmental Agency", 
+            "Local Emergency Management",
+            "Public Health Department",
+            "Environmental Services"
+        ] else [
+            "Environmental Response Team",
+            "Facility Management"
+        ],
+        emergencyActionItems: if (vars.alertLevel == "CRITICAL") [
+            "Issue public health advisory",
+            "Activate emergency response protocol",
+            "Deploy emergency services",
+            "Coordinate media response"
+        ] else [
+            "Monitor situation closely",
+            "Prepare contingency plans",
+            "Check system status"
+        ],
+        slotifyIntegration: {
+            schedulingEnabled: requiresCoordination(vars.alertLevel),
+            meetingRoom: "Environmental Emergency Ops Center",
+            videoConference: "https://slotify.io/env-emergency-" ++ now() as String {format: "yyyyMMddHHmmss"},
+            participantNotifications: requiresCoordination(vars.alertLevel)
+        }
+    },
+    publicNotification: {
+        publicAlertIssued: vars.alertLevel == "CRITICAL",
+        notificationChannels: if (vars.alertLevel == "CRITICAL") [
+            "Emergency Alert System",
+            "Local Media",
+            "Social Media", 
+            "Direct Customer Notification",
+            "Municipal Website"
+        ] else [
+            "Environmental Monitoring Portal",
+            "Facility Notifications"
+        ],
+        affectedAreas: [
+            payload.location ++ " District",
+            payload.location ++ " Surrounding Areas"
+        ],
+        communityResources: if (vars.alertLevel == "CRITICAL") [
+            "Emergency water distribution centers",
+            "Community health resources",
+            "Environmental information hotline"
+        ] else []
+    },
+    status: "ACTIVE",
+    submittedBy: "SYSTEM.ALERT",
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                
+                <!-- Log alert creation -->
+                <logger level="WARN" message="Environmental emergency alert created: #[vars.facilityId] - #[vars.alertLevel] - #[vars.emergencyType]" doc:name="Log Alert Creation"/>
+                
+                <!-- Trigger coordination workflow if needed -->
+                <choice doc:name="Trigger Emergency Coordination">
+                    <when expression="#[vars.alertLevel == 'CRITICAL' or vars.alertLevel == 'EMERGENCY']">
+                        <logger level="ERROR" message="CRITICAL/EMERGENCY alert - triggering multi-agency coordination for facility #[vars.facilityId]" doc:name="Log Emergency Coordination"/>
+                        <!-- Here you would integrate with Slotify emergency scheduling -->
+                    </when>
+                    <otherwise>
+                        <logger level="INFO" message="Warning alert created - standard monitoring protocols apply" doc:name="Log Standard Alert"/>
+                    </otherwise>
+                </choice>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

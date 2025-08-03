@@ -1,0 +1,19 @@
+#%RAML 1.0 Trait
+
+usage: Enables geospatial filtering of environmental data
+
+queryParameters:
+  latitude?:
+    type: number
+    description: Latitude for geographic filtering
+    example: 40.7128
+  longitude?:
+    type: number
+    description: Longitude for geographic filtering
+    example: -74.0060
+  radiusKm?:
+    type: number
+    minimum: 0.1
+    maximum: 100
+    description: Radius in kilometers for area filter
+    example: 10

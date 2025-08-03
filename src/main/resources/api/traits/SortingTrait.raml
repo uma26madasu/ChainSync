@@ -1,0 +1,15 @@
+#%RAML 1.0 Trait
+
+usage: Allows sorting results by timestamp, risk score, or other fields
+
+queryParameters:
+  sortBy?:
+    type: string
+    enum: ["timestamp", "riskScore", "name", "facilityType"]
+    description: Field to sort results by
+    example: "timestamp"
+  sortOrder?:
+    type: string
+    enum: ["asc", "desc"]
+    description: Sort direction
+    default: "asc"

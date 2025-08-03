@@ -1,0 +1,33 @@
+#%RAML 1.0 Library
+
+types:
+
+  RegulatoryComplianceReport:
+    type: object
+    description: Automated regulatory compliance report for environmental agencies
+    properties:
+      reportId: string
+      facilityId: string
+      reportType:
+        type: string
+        enum: ["IMMEDIATE_NOTIFICATION", "MONTHLY_COMPLIANCE", "ANNUAL_REPORT", "INCIDENT_REPORT", "VIOLATION_RESPONSE"]
+      regulatoryAgency:
+        type: string
+        enum: ["EPA", "STATE_DEQ", "PUBLIC_UTILITIES_COMMISSION", "HEALTH_DEPARTMENT", "LOCAL_ENVIRONMENTAL"]
+      complianceStatus:
+        type: string
+        enum: ["COMPLIANT", "VIOLATION", "WARNING", "UNDER_INVESTIGATION"]
+      submissionDeadline: datetime
+      submissionStatus:
+        type: string
+        enum: ["AUTO_SUBMITTED", "DRAFT_PREPARED", "PENDING_REVIEW", "SUBMITTED", "ACKNOWLEDGED"]
+      confirmationNumber: string
+      reportContent:
+        type: object
+        properties:
+          violationDetails: string
+          correctiveActions:
+            type: string[]
+          timeline: string
+          monitoringData:
+            type: object

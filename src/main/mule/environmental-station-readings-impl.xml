@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Submit Station Reading Flow -->
+    <flow name="post:\environmental-data\(stationId)\readings:application\json:chainsync-platform-api-config" doc:name="Submit Station Reading">
+        <ee:transform doc:name="Extract Station ID and Validate Input">
+            <ee:variables>
+                <ee:set-variable variableName="stationId">attributes.uriParams.'stationId'</ee:set-variable>
+                <ee:set-variable variableName="submittedBy">payload.submittedBy default "SYSTEM"</ee:set-variable>
+                <ee:set-variable variableName="sensorType">payload.sensorType</ee:set-variable>
+                <ee:set-variable variableName="sensorData">payload.data</ee:set-variable>
+                <ee:set-variable variableName="notes">payload.notes default ""</ee:set-variable>
+                <ee:set-variable variableName="readingTimestamp">payload.readingTimestamp default now()</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Validate station exists -->
+        <choice doc:name="Validate Station">
+            <when expression="#[vars.stationId startsWith 'STATION_' or vars.stationId contains 'CENTRAL']">
+                <!-- Valid station format, process reading -->
+                <ee:transform doc:name="Process Station Reading">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Determine processing status based on sensor data
+fun determineProcessingStatus(sensorType, data) = 
+    if (sensorType == "WATER_QUALITY" and data."E.coli" == "Not Detected") "ACCEPTED"
+    else if (sensorType == "AIR_MONITORING" and data.pm25? and (data.pm25 as Number) < 50) "ACCEPTED"
+    else if (sensorType == "SOIL_ANALYSIS") "QUEUED"
+    else "ACCEPTED"
+
+// Generate appropriate response message
+fun generateMessage(status, sensorType) = 
+    if (status == "ACCEPTED") "Reading integrated successfully into analytics pipeline."
+    else if (status == "QUEUED") "Reading queued for batch processing."
+    else "Reading received and under review."
+
+---
+{
+    stationId: vars.stationId,
+    sensorType: vars.sensorType,
+    data: vars.sensorData,
+    readingTimestamp: vars.readingTimestamp as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    submittedBy: vars.submittedBy,
+    processingStatus: determineProcessingStatus(vars.sensorType, vars.sensorData),
+    ingestedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    message: generateMessage(determineProcessingStatus(vars.sensorType, vars.sensorData), vars.sensorType),
+    notes: vars.notes
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                
+                <!-- Log the reading for audit -->
+                <logger level="INFO" message="Station reading processed: #[vars.stationId] - #[vars.sensorType]" doc:name="Log Reading"/>
+            </when>
+            <otherwise>
+                <!-- Invalid station ID -->
+                <ee:transform doc:name="Invalid Station Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "STATION_NOT_FOUND",
+        message: "Invalid station ID: " ++ vars.stationId,
+        details: "Station ID must start with 'STATION_' or contain 'CENTRAL'",
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

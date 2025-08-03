@@ -1,0 +1,54 @@
+#%RAML 1.0 Library
+types:
+  EnvironmentalStationData:
+    type: object
+    description: Real-time environmental monitoring data from a single station
+    properties:
+      stationId:
+        type: string
+        description: Unique monitoring station identifier
+        example: "NYC_CENTRAL_001"
+      location:
+        type: string
+        description: Human-readable station location
+        example: "Central Manhattan, NYC"
+      coordinates:
+        type: object
+        properties:
+          latitude: number
+          longitude: number
+      airQuality:
+        type: object
+        description: Real-time air pollution levels
+        properties:
+          pm25: number
+          pm10: number
+          nox: number
+          co: number
+          so2: number
+          o3: number
+      weather:
+        type: object
+        description: Ambient weather conditions
+        properties:
+          temperatureC: number
+          humidityPercent: integer
+          windSpeedKph: number
+          condition: string
+      riskAssessment:
+        type: object
+        properties:
+          environmentalRiskScore:
+            type: integer
+            minimum: 1
+            maximum: 10
+            example: 4
+          publicHealthAdvisory:
+            type: string
+            example: "Moderate air pollution; sensitive groups should limit outdoor activity"
+      timestamp:
+        type: datetime
+        example: "2025-07-09T20:00:00Z"
+      isRealTime:
+        type: boolean
+        example: true

@@ -1,0 +1,9 @@
+{
+  "dispatchId": "DISPATCH_20250715_TRUCK1121",
+  "vehicleId": "TRUCK_1121",
+  "status": "IN_TRANSIT",
+  "estimatedArrival": "2025-07-15T16:15:00Z",
+  "lastUpdate": "2025-07-15T14:22:00Z",
+  "trackingURL": "https://tracking.chainsync.io/vehicle/TRUCK_1121",
+  "message": "Vehicle dispatched successfully and is en route to NYC facility."
+}
