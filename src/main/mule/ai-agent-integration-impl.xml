@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+      http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+      http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <!-- Flow 1: Environmental Data for AI Agent -->
+    <flow name="get-environmental-data-flow">
+        <http:listener config-ref="HTTP_Listener_config" 
+                       path="/api/environmental/{facilityId}"/>
+        
+        <set-variable variableName="facilityId" value="#[attributes.uriParams.facilityId]"/>
+        <logger level="INFO" message="Getting environmental data for facility: #[vars.facilityId]"/>
+        
+        <!-- Set facility coordinates based on facilityId -->
+        <choice>
+            <when expression='#[vars.facilityId == "water-treatment-1"]'>
+                <set-variable variableName="facilityLat" value="33.7490"/>
+                <set-variable variableName="facilityLon" value="-84.3880"/>
+                <set-variable variableName="facilityType" value="WATER_TREATMENT"/>
+            </when>
+            <when expression='#[vars.facilityId == "waste-processing-1"]'>
+                <set-variable variableName="facilityLat" value="33.7590"/>
+                <set-variable variableName="facilityLon" value="-84.3780"/>
+                <set-variable variableName="facilityType" value="WASTE_PROCESSING"/>
+            </when>
+            <when expression='#[vars.facilityId == "energy-gen-1"]'>
+                <set-variable variableName="facilityLat" value="33.7690"/>
+                <set-variable variableName="facilityLon" value="-84.3680"/>
+                <set-variable variableName="facilityType" value="ENERGY_GENERATION"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="facilityLat" value="33.7490"/>
+                <set-variable variableName="facilityLon" value="-84.3880"/>
+                <set-variable variableName="facilityType" value="GENERAL"/>
+            </otherwise>
+        </choice>
+        
+        <!-- Get Weather Data - Direct URL with query string -->
+        <try>
+            <http:request method="GET" 
+                          url="#['https://api.openweathermap.org/data/2.5/weather?lat=' ++ vars.facilityLat ++ '&amp;lon=' ++ vars.facilityLon ++ '&amp;appid=${openweathermap.api.key}&amp;units=metric']"/>
+            <error-handler>
+                <on-error-continue type="ANY">
+                    <logger level="WARN" message="Weather API unavailable, using mock data"/>
+                    <set-payload value='{"main":{"temp":22,"humidity":60,"pressure":1013},"weather":[{"description":"Weather data unavailable"}],"wind":{"speed":10}}'/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+        
+        <set-variable variableName="weatherData" value="#[payload]"/>
+        
+        <!-- Transform for AI Agent -->
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    facilityId: vars.facilityId,
+    facilityType: vars.facilityType,
+    timestamp: now(),
+    location: {
+        lat: vars.facilityLat as Number,
+        lon: vars.facilityLon as Number
+    },
+    operationalStatus: "ACTIVE",
+    dataQuality: "GOOD",
+    environmental: {
+        temperature: vars.weatherData.main.temp,
+        humidity: vars.weatherData.main.humidity,
+        pressure: vars.weatherData.main.pressure,
+        windSpeed: if (vars.weatherData.wind?) vars.weatherData.wind.speed else 0,
+        conditions: vars.weatherData.weather[0].description
+    },
+    waterQuality: if (vars.facilityType == "WATER_TREATMENT") 
+        {
+            ph: 7.2 + (random() * 0.6 - 0.3),
+            turbidity: 0.4 + (random() * 0.3),
+            chlorine: 2.1 + (random() * 0.4 - 0.2),
+            dissolvedOxygen: 8.5 + (random() * 1.0 - 0.5)
+        } else null,
+    gasLevels: if (vars.facilityType == "WASTE_PROCESSING")
+        {
+            methane: 2.5 + (random() * 1.5),
+            hydrogenSulfide: 5 + (random() * 3),
+            ammonia: 15 + (random() * 5)
+        } else null,
+    emissions: if (vars.facilityType == "ENERGY_GENERATION")
+        {
+            co2: 120 + (random() * 20 - 10),
+            so2: 8 + (random() * 3),
+            nox: 35 + (random() * 15)
+        } else null,
+    operational: {
+        efficiency: 85 + (random() * 12),
+        lastMaintenance: "2025-07-15",
+        nextInspection: "2025-09-01"
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        
+        <logger level="INFO" message="Environmental data response sent for facility: #[vars.facilityId]"/>
+        
+        <error-handler>
+            <on-error-propagate type="ANY">
+                <logger level="ERROR" message="Error getting environmental data: #[error.description]"/>
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "ENVIRONMENTAL_DATA_ERROR",
+        message: "Unable to retrieve environmental data",
+        facilityId: vars.facilityId,
+        timestamp: now()
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">500</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <!-- Flow 2: Receive AI Alerts -->
+    <flow name="post-alerts-flow">
+        <http:listener config-ref="HTTP_Listener_config" 
+                       path="/api/alerts"/>
+        
+        <logger level="INFO" message="AI Alert received: #[payload.id] - #[payload.severity]"/>
+        
+        <!-- Basic validation -->
+        <choice>
+            <when expression="#[payload.facilityId == null]">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "MISSING_FACILITY_ID",
+        message: "Facility ID is required",
+        timestamp: now()
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Process the alert -->
+                <choice>
+                    <when expression='#[payload.severity == "CRITICAL"]'>
+                        <logger level="ERROR" message="CRITICAL ALERT: #[payload.message]"/>
+                    </when>
+                    <when expression='#[payload.severity == "HIGH"]'>
+                        <logger level="WARN" message="HIGH PRIORITY ALERT: #[payload.message]"/>
+                    </when>
+                    <otherwise>
+                        <logger level="INFO" message="Standard Alert: #[payload.message]"/>
+                    </otherwise>
+                </choice>
+                
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "alert_received",
+    alertId: payload.id,
+    facilityId: payload.facilityId,
+    severity: payload.severity,
+    timestamp: now(),
+    actions: [
+        "Alert logged in ChainSync database",
+        "Notifications sent based on severity: " ++ payload.severity,
+        if (payload.severity == "CRITICAL") 
+            "Emergency protocols activated" 
+        else 
+            "Standard monitoring continued"
+    ],
+    chainSyncProcessed: true
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
+        
+        <error-handler>
+            <on-error-propagate type="ANY">
+                <logger level="ERROR" message="Error processing alert: #[error.description]"/>
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "ALERT_PROCESSING_ERROR",
+        message: "Unable to process alert",
+        timestamp: now()
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">500</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <!-- Flow 3: Receive Emergency Notifications -->
+    <flow name="post-emergency-flow">
+        <http:listener config-ref="HTTP_Listener_config" 
+                       path="/api/emergency"/>
+        
+        <logger level="ERROR" message="AI Emergency notification: #[payload.'type'] at facility #[payload.facilityId]"/>
+        
+        <!-- Basic validation -->
+        <choice>
+            <when expression="#[payload.facilityId == null]">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "MISSING_FACILITY_ID",
+        message: "Facility ID is required for emergency",
+        timestamp: now()
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Emergency response logic -->
+                <set-variable variableName="emergencyResponse" value="INCIDENT_LOGGED"/>
+                
+                <choice>
+                    <when expression='#[payload.severity == "CRITICAL"]'>
+                        <logger level="ERROR" message="Activating emergency response procedures for facility: #[payload.facilityId]"/>
+                        <set-variable variableName="emergencyResponse" value="EMERGENCY_PROTOCOLS_ACTIVATED"/>
+                    </when>
+                    <otherwise>
+                        <logger level="WARN" message="Incident logged for facility: #[payload.facilityId]"/>
+                    </otherwise>
+                </choice>
+                
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "emergency_received",
+    emergencyId: payload.id,
+    facilityId: payload.facilityId,
+    'type': payload.'type',
+    severity: payload.severity default "HIGH",
+    timestamp: now(),
+    response: vars.emergencyResponse,
+    actions: [
+        "Emergency logged in ChainSync system",
+        "Emergency contacts notified",
+        "Incident response team alerted",
+        if (payload.severity == "CRITICAL") 
+            "Regulatory authorities will be notified" 
+        else 
+            "Monitoring enhanced for facility"
+    ]
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
+        
+        <error-handler>
+            <on-error-propagate type="ANY">
+                <logger level="ERROR" message="Error processing emergency: #[error.description]"/>
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "EMERGENCY_PROCESSING_ERROR",
+        message: "Unable to process emergency notification",
+        timestamp: now()
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">500</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+</mule>
