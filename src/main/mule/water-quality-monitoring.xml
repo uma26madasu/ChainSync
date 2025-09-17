@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <!-- Water Quality Monitoring Flow -->
+    <flow name="get:\water-quality\(facilityId):chainsync-platform-api-config" doc:name="Get Water Quality Data">
+        <ee:transform doc:name="Extract Facility ID">
+            <ee:variables>
+                <ee:set-variable variableName="facilityId">attributes.uriParams.'facilityId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Get facility details to find nearest water monitoring station -->
+        <flow-ref name="get:\environmental-facilities\(facilityId):chainsync-platform-api-config" doc:name="Get Facility Location"/>
+        
+        <choice doc:name="Check Facility Exists">
+            <when expression="#[!payload.error?]">
+                <ee:transform doc:name="Store Facility Data">
+                    <ee:variables>
+                        <ee:set-variable variableName="facilityData">payload</ee:set-variable>
+                        <ee:set-variable variableName="lat">payload.coordinates.latitude</ee:set-variable>
+                        <ee:set-variable variableName="lon">payload.coordinates.longitude</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+                
+                <!-- Try USGS Water Data first -->
+                <try>
+                    <!-- Get nearest USGS monitoring stations -->
+                    <http:request method="GET" 
+                                  url="#['https://waterservices.usgs.gov/nwis/iv/?format=json&amp;bBox=' ++ (vars.lon - 0.5) ++ ',' ++ (vars.lat - 0.5) ++ ',' ++ (vars.lon + 0.5) ++ ',' ++ (vars.lat + 0.5) ++ '&amp;period=PT2H&amp;siteStatus=active']"
+                                  doc:name="Get USGS Water Data"/>
+                    
+                    <ee:transform doc:name="Transform USGS Data to Water Quality Format">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Helper function to extract parameter value
+fun extractParameter(timeSeries, parameterCode) = 
+    (timeSeries filter ($.variable.variableCode[0].value == parameterCode))[0].values[0].value[0].value default null
+
+// Helper function to determine water quality status
+fun determineQualityStatus(params) = 
+    if (params.ph? and (params.ph < 6.5 or params.ph > 8.5)) "VIOLATION"
+    else if (params.turbidity? and params.turbidity > 5) "WARNING"
+    else if (params.dissolvedOxygen? and params.dissolvedOxygen < 5) "WARNING"
+    else if (params.temperature? and (params.temperature < 0 or params.temperature > 30)) "CONCERN"
+    else "COMPLIANT"
+
+// Helper function to calculate water quality index
+fun calculateWQI(params) = do {
+    var scores = []
+    
+    // pH score (ideal range 6.5-8.5)
+    ++ (if (params.ph?) 
+        [if (params.ph >= 6.5 and params.ph <= 8.5) 100 
+         else max([0, 100 - (abs(params.ph - 7.5) * 20)])]
+        else [])
+    
+    // Dissolved oxygen score (higher is better, >8 is excellent)
+    ++ (if (params.dissolvedOxygen?) 
+        [min([100, (params.dissolvedOxygen / 8) * 100])]
+        else [])
+    
+    // Turbidity score (lower is better, <5 NTU is good)
+    ++ (if (params.turbidity?) 
+        [max([0, 100 - (params.turbidity * 10)])]
+        else [])
+    
+    // Temperature score (15-25°C is ideal)
+    ++ (if (params.temperature?) 
+        [if (params.temperature >= 15 and params.temperature <= 25) 100
+         else max([0, 100 - (abs(params.temperature - 20) * 5)])]
+        else [])
+    ---
+    if (sizeOf(scores) > 0) avg(scores) else 75
+}
+
+var usgsData = payload.value.timeSeries default []
+var hasData = sizeOf(usgsData) > 0
+
+// Extract water parameters from USGS data
+var waterParams = if (hasData) {
+    temperature: extractParameter(usgsData, "00010"),  // Temperature in Celsius
+    ph: extractParameter(usgsData, "00400"),           // pH
+    dissolvedOxygen: extractParameter(usgsData, "00300"), // DO in mg/L
+    turbidity: extractParameter(usgsData, "63680"),    // Turbidity in NTU
+    specificConductance: extractParameter(usgsData, "00095"), // Specific conductance
+    discharge: extractParameter(usgsData, "00060")     // Stream flow
+} else {
+    // Fallback simulated data
+    temperature: 20 + (randomInt(10) - 5),
+    ph: 7.0 + ((randomInt(20) - 10) / 10),
+    dissolvedOxygen: 8.0 + ((randomInt(40) - 20) / 10),
+    turbidity: 1.0 + (randomInt(40) / 10),
+    specificConductance: 500 + randomInt(200),
+    discharge: null
+}
+
+---
+{
+    facilityId: vars.facilityId,
+    facilityName: vars.facilityData.facilityName,
+    location: vars.facilityData.location,
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    
+    waterQualityParameters: {
+        // Primary parameters
+        ph: {
+            value: waterParams.ph default 7.2,
+            unit: "pH units",
+            status: if (waterParams.ph?) 
+                    (if (waterParams.ph >= 6.5 and waterParams.ph <= 8.5) "NORMAL" 
+                     else if (waterParams.ph < 6.0 or waterParams.ph > 9.0) "CRITICAL"
+                     else "WARNING")
+                    else "NORMAL",
+            epaLimit: {min: 6.5, max: 8.5}
+        },
+        
+        turbidity: {
+            value: waterParams.turbidity default 0.5,
+            unit: "NTU",
+            status: if (waterParams.turbidity?) 
+                    (if (waterParams.turbidity <= 1) "EXCELLENT"
+                     else if (waterParams.turbidity <= 5) "GOOD"
+                     else if (waterParams.turbidity <= 10) "FAIR"
+                     else "POOR")
+                    else "GOOD",
+            epaLimit: 5.0,
+            interpretation: if (waterParams.turbidity? and waterParams.turbidity > 5) 
+                           "High turbidity - possible contamination" 
+                           else "Within acceptable range"
+        },
+        
+        dissolvedOxygen: {
+            value: waterParams.dissolvedOxygen default 8.5,
+            unit: "mg/L",
+            status: if (waterParams.dissolvedOxygen?)
+                    (if (waterParams.dissolvedOxygen >= 8) "EXCELLENT"
+                     else if (waterParams.dissolvedOxygen >= 5) "ADEQUATE"
+                     else "POOR")
+                    else "EXCELLENT",
+            minimumRequired: 5.0
+        },
+        
+        temperature: {
+            value: waterParams.temperature default 20,
+            unit: "°C",
+            status: if (waterParams.temperature?)
+                    (if (waterParams.temperature >= 0 and waterParams.temperature <= 30) "NORMAL"
+                     else "ABNORMAL")
+                    else "NORMAL"
+        },
+        
+        // Additional parameters for water treatment facilities
+        chlorineResidual: {
+            value: 0.8 + ((randomInt(10) - 5) / 10),  // Simulated as USGS doesn't provide
+            unit: "mg/L",
+            status: "ADEQUATE",
+            targetRange: {min: 0.5, max: 1.0}
+        },
+        
+        // Bacterial indicators (would come from lab tests, not USGS)
+        bacterialIndicators: {
+            totalColiform: {
+                value: 0,
+                unit: "CFU/100mL",
+                status: "NOT_DETECTED",
+                epaLimit: 0
+            },
+            eColi: {
+                value: 0,
+                unit: "CFU/100mL", 
+                status: "NOT_DETECTED",
+                epaLimit: 0
+            },
+            lastLabTest: (now() - |P2D|) as String {format: "yyyy-MM-dd"},
+            nextLabTest: (now() + |P5D|) as String {format: "yyyy-MM-dd"}
+        },
+        
+        specificConductance: if (waterParams.specificConductance?) {
+            value: waterParams.specificConductance,
+            unit: "µS/cm",
+            interpretation: if (waterParams.specificConductance < 500) "Low mineral content"
+                          else if (waterParams.specificConductance < 1000) "Moderate mineral content"
+                          else "High mineral content"
+        } else null
+    },
+    
+    waterQualityIndex: {
+        score: calculateWQI(waterParams),
+        grade: if (calculateWQI(waterParams) >= 90) "A"
+               else if (calculateWQI(waterParams) >= 70) "B"
+               else if (calculateWQI(waterParams) >= 50) "C"
+               else if (calculateWQI(waterParams) >= 25) "D"
+               else "F",
+        interpretation: if (calculateWQI(waterParams) >= 90) "Excellent water quality"
+                       else if (calculateWQI(waterParams) >= 70) "Good water quality"
+                       else if (calculateWQI(waterParams) >= 50) "Fair water quality"
+                       else if (calculateWQI(waterParams) >= 25) "Poor water quality"
+                       else "Very poor water quality"
+    },
+    
+    compliance: {
+        overallStatus: determineQualityStatus(waterParams),
+        epaCompliant: determineQualityStatus(waterParams) != "VIOLATION",
+        safeForConsumption: waterParams.ph >= 6.5 and waterParams.ph <= 8.5 and 
+                            waterParams.turbidity <= 5,
+        violations: [] ++
+            (if (waterParams.ph? and (waterParams.ph < 6.5 or waterParams.ph > 8.5)) 
+                ["pH outside EPA range (6.5-8.5)"] else []) ++
+            (if (waterParams.turbidity? and waterParams.turbidity > 5) 
+                ["Turbidity exceeds EPA limit of 5 NTU"] else []) ++
+            (if (waterParams.dissolvedOxygen? and waterParams.dissolvedOxygen < 5) 
+                ["Dissolved oxygen below minimum 5 mg/L"] else []),
+        reportingRequired: determineQualityStatus(waterParams) == "VIOLATION",
+        lastInspection: (now() - |P15D|) as String {format: "yyyy-MM-dd"},
+        nextInspection: (now() + |P15D|) as String {format: "yyyy-MM-dd"}
+    },
+    
+    treatmentRecommendations: [] ++
+        (if (waterParams.ph? and waterParams.ph < 6.5) 
+            ["Add alkaline chemicals to increase pH"] else []) ++
+        (if (waterParams.ph? and waterParams.ph > 8.5) 
+            ["Add acidic chemicals to decrease pH"] else []) ++
+        (if (waterParams.turbidity? and waterParams.turbidity > 5) 
+            ["Increase coagulation/flocculation", "Check filter performance"] else []) ++
+        (if (waterParams.dissolvedOxygen? and waterParams.dissolvedOxygen < 5) 
+            ["Increase aeration", "Check for organic contamination"] else []) ++
+        (if (waterParams.temperature? and waterParams.temperature > 25) 
+            ["Monitor for algae growth", "Increase chlorination if needed"] else []),
+    
+    alerts: {
+        triggered: determineQualityStatus(waterParams) != "COMPLIANT",
+        level: if (determineQualityStatus(waterParams) == "VIOLATION") "CRITICAL"
+               else if (determineQualityStatus(waterParams) == "WARNING") "HIGH"
+               else "LOW",
+        message: if (determineQualityStatus(waterParams) == "VIOLATION") 
+                 "Water quality violation detected - immediate action required"
+                 else if (determineQualityStatus(waterParams) == "WARNING")
+                 "Water quality parameters approaching limits"
+                 else null,
+        actions: if (determineQualityStatus(waterParams) != "COMPLIANT") [
+            "Increase monitoring frequency",
+            "Collect additional samples for lab testing",
+            "Review treatment processes",
+            "Prepare regulatory notification if needed"
+        ] else []
+    },
+    
+    publicHealthAdvisory: {
+        required: determineQualityStatus(waterParams) == "VIOLATION",
+        type: if (waterParams.turbidity? and waterParams.turbidity > 5) "BOIL_WATER_ADVISORY"
+              else if (waterParams.ph? and (waterParams.ph < 6.0 or waterParams.ph > 9.5)) "DO_NOT_USE"
+              else null,
+        affectedPopulation: if (determineQualityStatus(waterParams) == "VIOLATION") 
+                           vars.facilityData.affectedPopulation default 50000
+                           else 0,
+        notificationChannels: if (determineQualityStatus(waterParams) == "VIOLATION") [
+            "Emergency Alert System",
+            "Local Media",
+            "Municipal Website",
+            "Direct Customer Notification"
+        ] else []
+    },
+    
+    dataSource: if (hasData) "USGS Water Services (Real-time)" 
+                else "Simulated Data (USGS unavailable)",
+    usgsStationId: if (hasData and sizeOf(usgsData) > 0) 
+                   usgsData[0].sourceInfo.siteCode[0].value 
+                   else null,
+    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    nextUpdate: (now() + |PT1H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                    
+                    <error-handler>
+                        <on-error-continue type="ANY">
+                            <logger level="WARN" message="USGS API unavailable, using simulated water quality data"/>
+                            <!-- Fallback to simulated data -->
+                            <ee:transform doc:name="Simulated Water Quality Data">
+                                <ee:message>
+                                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    facilityId: vars.facilityId,
+    facilityName: vars.facilityData.facilityName,
+    location: vars.facilityData.location,
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    
+    waterQualityParameters: {
+        ph: {
+            value: 7.2 + ((randomInt(10) - 5) / 10),
+            unit: "pH units",
+            status: "NORMAL",
+            epaLimit: {min: 6.5, max: 8.5}
+        },
+        turbidity: {
+            value: 0.5 + (randomInt(20) / 10),
+            unit: "NTU",
+            status: "GOOD",
+            epaLimit: 5.0
+        },
+        dissolvedOxygen: {
+            value: 8.5 + ((randomInt(20) - 10) / 10),
+            unit: "mg/L",
+            status: "EXCELLENT",
+            minimumRequired: 5.0
+        },
+        temperature: {
+            value: 20 + (randomInt(10) - 5),
+            unit: "°C",
+            status: "NORMAL"
+        },
+        chlorineResidual: {
+            value: 0.8 + ((randomInt(10) - 5) / 10),
+            unit: "mg/L",
+            status: "ADEQUATE",
+            targetRange: {min: 0.5, max: 1.0}
+        },
+        bacterialIndicators: {
+            totalColiform: {
+                value: 0,
+                unit: "CFU/100mL",
+                status: "NOT_DETECTED"
+            },
+            eColi: {
+                value: 0,
+                unit: "CFU/100mL",
+                status: "NOT_DETECTED"
+            }
+        }
+    },
+    
+    waterQualityIndex: {
+        score: 85 + randomInt(15),
+        grade: "B",
+        interpretation: "Good water quality"
+    },
+    
+    compliance: {
+        overallStatus: "COMPLIANT",
+        epaCompliant: true,
+        safeForConsumption: true,
+        violations: []
+    },
+    
+    dataSource: "Simulated Data (Demo Mode)",
+    lastUpdated: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                                </ee:message>
+                            </ee:transform>
+                        </on-error-continue>
+                    </error-handler>
+                </try>
+            </when>
+            <otherwise>
+                <ee:transform doc:name="Facility Not Found">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    error: {
+        code: "FACILITY_NOT_FOUND",
+        message: "Cannot retrieve water quality: facility not found",
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </otherwise>
+        </choice>
+    </flow>
+
+    <!-- Water Quality Alert Submission -->
+    <flow name="post:\water-quality\alerts:application\json:chainsync-platform-api-config" doc:name="Submit Water Quality Alert">
+        <ee:transform doc:name="Process Alert">
+            <ee:variables>
+                <ee:set-variable variableName="facilityId">payload.facilityId</ee:set-variable>
+                <ee:set-variable variableName="alertType">payload.alertType</ee:set-variable>
+                <ee:set-variable variableName="parameter">payload.parameter</ee:set-variable>
+                <ee:set-variable variableName="value">payload.value</ee:set-variable>
+                <ee:set-variable variableName="threshold">payload.threshold</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <ee:transform doc:name="Generate Water Quality Alert Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Determine alert severity
+fun determineSeverity(parameter, value) = 
+    if (parameter == "eColi" and value > 0) "CRITICAL"
+    else if (parameter == "ph" and (value < 6.0 or value > 9.0)) "CRITICAL"
+    else if (parameter == "turbidity" and value > 10) "HIGH"
+    else if (parameter == "dissolvedOxygen" and value < 3) "HIGH"
+    else "MEDIUM"
+
+// Generate response actions
+fun generateActions(alertType, parameter) = 
+    if (alertType == "CONTAMINATION") [
+        "Immediately stop water distribution",
+        "Collect samples for lab testing",
+        "Issue boil water advisory",
+        "Notify EPA within 1 hour",
+        "Activate emergency response team"
+    ]
+    else if (alertType == "PARAMETER_EXCEEDANCE") [
+        "Increase monitoring frequency",
+        "Adjust treatment process",
+        "Document exceedance",
+        "Prepare regulatory report"
+    ]
+    else [
+        "Review treatment process",
+        "Check equipment calibration",
+        "Monitor parameter closely"
+    ]
+
+---
+{
+    alertId: "WQ_ALERT_" ++ now() as String {format: "yyyyMMdd_HHmmss"},
+    facilityId: vars.facilityId,
+    alertType: vars.alertType,
+    parameter: vars.parameter,
+    recordedValue: vars.value,
+    threshold: vars.threshold,
+    exceedanceAmount: abs(vars.value - vars.threshold),
+    severity: determineSeverity(vars.parameter, vars.value),
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    
+    regulatoryResponse: {
+        notificationRequired: determineSeverity(vars.parameter, vars.value) == "CRITICAL",
+        notificationDeadline: if (determineSeverity(vars.parameter, vars.value) == "CRITICAL")
+                              (now() + |PT1H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+                              else (now() + |PT24H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+        agenciesToNotify: if (determineSeverity(vars.parameter, vars.value) == "CRITICAL") [
+            "EPA Regional Office",
+            "State Health Department",
+            "Local Water Authority"
+        ] else ["Local Water Authority"]
+    },
+    
+    publicHealthResponse: {
+        advisoryRequired: vars.alertType == "CONTAMINATION" or 
+                         (vars.parameter == "eColi" and vars.value > 0),
+        advisoryType: if (vars.parameter == "eColi" and vars.value > 0) "BOIL_WATER"
+                     else if (vars.parameter == "turbidity" and vars.value > 10) "BOIL_WATER"
+                     else null,
+        estimatedAffectedPopulation: 50000,
+        notificationMethod: ["Emergency Alert System", "Local Media", "Door-to-door"]
+    },
+    
+    immediateActions: generateActions(vars.alertType, vars.parameter),
+    
+    coordinationWorkflow: {
+        emergencyMeetingRequired: determineSeverity(vars.parameter, vars.value) == "CRITICAL",
+        participants: if (determineSeverity(vars.parameter, vars.value) == "CRITICAL") [
+            "Water Quality Manager",
+            "Plant Operations Chief",
+            "Public Health Officer",
+            "EPA Liaison",
+            "Communications Director"
+        ] else [
+            "Water Quality Manager",
+            "Plant Operations Chief"
+        ]
+    },
+    
+    status: "ACTIVE",
+    acknowledgmentRequired: true,
+    message: "Water quality alert processed. " ++ 
+             if (determineSeverity(vars.parameter, vars.value) == "CRITICAL") 
+             "CRITICAL: Immediate action required!" 
+             else "Alert logged for review and action."
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        
+        <logger level="WARN" message="Water quality alert created: #[vars.facilityId] - #[vars.alertType] - #[vars.parameter]"/>
+    </flow>
+
+</mule>
