@@ -32,9 +32,15 @@
                 
                 <!-- Call OpenWeatherMap Air Pollution API -->
                 <try>
-                    <http:request method="GET" 
-                                  url="#['http://api.openweathermap.org/data/2.5/air_pollution?lat=' ++ vars.lat ++ '&amp;lon=' ++ vars.lon ++ '&amp;appid=' ++ p('openweathermap.api.key')]"
-                                  doc:name="Get Air Pollution Data"/>
+                    <http:request method="GET"
+                                  url="https://api.openweathermap.org/data/2.5/air_pollution"
+                                  doc:name="Get Air Pollution Data">
+                        <http:query-params><![CDATA[#[{
+                            'lat': vars.lat,
+                            'lon': vars.lon,
+                            'appid': p('openweathermap.api.key')
+                        }]]]></http:query-params>
+                    </http:request>
                     
                     <ee:transform doc:name="Transform to ESG Format">
                         <ee:message>

@@ -40,10 +40,18 @@
             </otherwise>
         </choice>
         
-        <!-- Get Weather Data - Direct URL with query string -->
+        <!-- Get Weather Data - Using proper query parameters -->
         <try>
-            <http:request method="GET" 
-                          url="#['https://api.openweathermap.org/data/2.5/weather?lat=' ++ vars.facilityLat ++ '&amp;lon=' ++ vars.facilityLon ++ '&amp;appid=${openweathermap.api.key}&amp;units=metric']"/>
+            <http:request method="GET"
+                          url="https://api.openweathermap.org/data/2.5/weather"
+                          doc:name="Get Weather Data">
+                <http:query-params><![CDATA[#[{
+                    'lat': vars.facilityLat,
+                    'lon': vars.facilityLon,
+                    'appid': p('openweathermap.api.key'),
+                    'units': 'metric'
+                }]]]></http:query-params>
+            </http:request>
             <error-handler>
                 <on-error-continue type="ANY">
                     <logger level="WARN" message="Weather API unavailable, using mock data"/>

@@ -175,13 +175,28 @@ output application/json
 var measurements = payload.results[0].measurements default []
 var getPollutant = (param) -> (measurements filter ($.parameter == param))[0].value default 0
 
-// Note: The AQI calculation provided seems simplified and specific.
-// Real AQI calculations are more complex and depend on local standards.
-// This function assumes a linear scaling for pm25 up to 12.0 for "Good".
-fun calculateAQI(msmts) =
-  if ((msmts filter ($.parameter == "pm25"))[0].value default 0 <= 12.0)
-    floor((50 / 12.0) * ((msmts filter ($.parameter == "pm25"))[0].value default 0))
-  else 101 // Placeholder for values > 12.0, you might need a more robust AQI logic
+// EPA AQI calculation for PM2.5
+// Uses standard EPA breakpoints for accurate AQI calculation
+fun calculateAQI(msmts) = do {
+    var pm25 = (msmts filter ($.parameter == "pm25"))[0].value default 0
+
+    // EPA PM2.5 breakpoints [concentration_low, concentration_high, aqi_low, aqi_high]
+    var breakpoints = [
+        [0.0, 12.0, 0, 50],       // Good
+        [12.1, 35.4, 51, 100],    // Moderate
+        [35.5, 55.4, 101, 150],   // Unhealthy for Sensitive Groups
+        [55.5, 150.4, 151, 200],  // Unhealthy
+        [150.5, 250.4, 201, 300], // Very Unhealthy
+        [250.5, 500.4, 301, 500]  // Hazardous
+    ]
+
+    var bp = (breakpoints filter (pm25 >= $[0] and pm25 <= $[1]))[0]
+    ---
+    if (bp?)
+        floor(((bp[3] - bp[2]) / (bp[1] - bp[0])) * (pm25 - bp[0]) + bp[2])
+    else if (pm25 > 500.4) 500
+    else 0
+}
 
 fun getAQILevel(aqi) =
   if (aqi <= 50) "Good"

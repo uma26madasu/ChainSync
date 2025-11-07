@@ -78,8 +78,50 @@ fun formatTimestamp(timestamp: DateTime): String =
 /**
  * Masks sensitive data for logging
  */
-fun maskSensitiveData(data: String): String = 
-    if (sizeOf(data) > 4) 
+fun maskSensitiveData(data: String): String =
+    if (sizeOf(data) > 4)
         data[0 to 3] ++ "*" * (sizeOf(data) - 8) ++ data[-4 to -1]
-    else 
+    else
         "*" * sizeOf(data)
+
+/**
+ * Determines facility type based on environmental station data
+ */
+fun determineFacilityType(station: Object): String =
+    if (station.airQuality.aqi > 100) "MONITORING_STATION"
+    else if (station.weather.visibility < 10) "WEATHER_STATION"
+    else "ENVIRONMENTAL_FACILITY"
+
+/**
+ * Maps operational status for environmental facilities
+ */
+fun getOperationalStatus(station: Object): Object = {
+    operationMode: if (station.riskAssessment.coordinationRequired) "ALERT" else "NORMAL",
+    equipmentStatus: "OPTIMAL",
+    processingEfficiency: if (station.airQuality.aqi < 50) 98.5
+                         else if (station.airQuality.aqi < 100) 95.0
+                         else 90.0,
+    backupSystems: ["Emergency Sensors", "Backup Communication"]
+}
+
+/**
+ * Determines compliance status based on air quality index
+ */
+fun getComplianceStatus(station: Object): Object = {
+    epaCompliant: station.airQuality.aqi < 150,
+    stateCompliant: station.airQuality.aqi < 100,
+    localCompliant: station.airQuality.aqi < 50,
+    lastViolation: if (station.airQuality.aqi > 150) "2024-11-05" else null,
+    nextInspection: "2025-08-15"
+}
+
+/**
+ * Generates standardized error response object
+ */
+fun generateErrorResponse(code: String, message: String): Object = {
+    error: {
+        code: code,
+        message: message,
+        timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+    }
+}
