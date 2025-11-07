@@ -46,3 +46,21 @@ target/
 .DS_Store
 velocity.log
 /bin/
+
+# --------------- #
+# Security        #
+# --------------- #
+# Local configuration with sensitive data
+config-local.properties
+**/config-local.properties
+
+# API keys and credentials
+*.key
+*.pem
+*.p12
+*.jks
+credentials.json
+
+# Environment-specific configs
+.env
+.env.local
