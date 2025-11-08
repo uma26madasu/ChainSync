@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # ChainSync AI Agents Service
+  agents:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chainsync-agents
+    ports:
+      - "8000:8000"
+    environment:
+      # OpenAI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # ChromaDB Configuration
+      - CHROMA_PERSIST_DIR=/app/data/chroma_db
+
+      # ChainSync API Configuration
+      - CHAINSYNC_API_URL=${CHAINSYNC_API_URL:-http://host.docker.internal:8081/api}
+
+      # Server Configuration
+      - AGENTS_PORT=8000
+      - AGENTS_HOST=0.0.0.0
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+      # CORS
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8081}
+
+      # Agent Settings
+      - MEMORY_AGENT_TOP_K=${MEMORY_AGENT_TOP_K:-5}
+      - MEMORY_AGENT_SIMILARITY_THRESHOLD=${MEMORY_AGENT_SIMILARITY_THRESHOLD:-0.7}
+      - REASONING_AGENT_MODEL=${REASONING_AGENT_MODEL:-gpt-4-turbo}
+      - REASONING_AGENT_TEMPERATURE=${REASONING_AGENT_TEMPERATURE:-0.2}
+      - REASONING_AGENT_MAX_ITERATIONS=${REASONING_AGENT_MAX_ITERATIONS:-10}
+
+    volumes:
+      # Persist ChromaDB data
+      - chroma-data:/app/data/chroma_db
+
+      # Mount source for development (optional - comment out for production)
+      # - ./src:/app/src
+
+    networks:
+      - chainsync-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    depends_on:
+      - chromadb
+
+  # ChromaDB Service (Vector Database)
+  chromadb:
+    image: chromadb/chroma:0.4.18
+    container_name: chainsync-chromadb
+    ports:
+      - "8001:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=${CHROMA_ANONYMIZED_TELEMETRY:-FALSE}
+
+    volumes:
+      - chroma-data:/chroma/chroma
+
+    networks:
+      - chainsync-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  chainsync-network:
+    driver: bridge
+    name: chainsync-network
+
+volumes:
+  chroma-data:
+    driver: local
+    name: chainsync-chroma-data
