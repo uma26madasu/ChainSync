@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="error-handling-test-suite.xml" />
+
+    <!-- Test Suite for Error Handling Scenarios -->
+
+    <!-- Test: Unauthorized Access - Missing Token -->
+    <munit:test name="unauthorized-access-missing-token-test"
+                description="Test 401 response when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <!-- No Authorization header -->
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Invalid Request Method -->
+    <munit:test name="invalid-request-method-test"
+                description="Test 405 Method Not Allowed for unsupported HTTP methods"
+                expectedErrorType="HTTP:METHOD_NOT_ALLOWED">
+
+        <munit:execution>
+            <http:request method="DELETE" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Invalid JSON Payload -->
+    <munit:test name="invalid-json-payload-test"
+                description="Test 400 Bad Request for malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[{
+  "facilityId": "FACILITY_001",
+  "emergencyType": "WATER_QUALITY_EXCEEDANCE"
+  // Invalid JSON - missing closing brace
+]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Resource Not Found -->
+    <munit:test name="resource-not-found-test"
+                description="Test 404 Not Found for non-existent endpoint"
+                expectedErrorType="HTTP:NOT_FOUND">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/non-existent-endpoint">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Health Check Endpoint -->
+    <munit:test name="health-check-success-test"
+                description="Test health check endpoint returns 200 OK">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/health">
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('UP')]"
+                message="Expected health status to be UP"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Content Type Validation -->
+    <munit:test name="invalid-content-type-test"
+                description="Test 415 Unsupported Media Type for invalid content type"
+                expectedErrorType="HTTP:UNSUPPORTED_MEDIA_TYPE">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[This is plain text, not JSON]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "text/plain"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Rate Limiting (if enabled) -->
+    <munit:test name="rate-limiting-test"
+                description="Test rate limiting behavior when enabled"
+                ignore="true">
+        <!-- This test should be enabled when rate limiting is configured -->
+        <munit:execution>
+            <!-- Make multiple rapid requests to trigger rate limiting -->
+            <foreach collection="#[1 to 100]">
+                <http:request method="GET" config-ref="HTTP_Request_configuration"
+                             path="/environmental-facilities">
+                    <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+                </http:request>
+            </foreach>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: External API Timeout Handling -->
+    <munit:test name="external-api-timeout-handling-test"
+                description="Test graceful handling of external API timeouts"
+                ignore="true">
+        <!-- This test validates that the system falls back to mock data when external APIs timeout -->
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 even if external APIs timeout (fallback to mock data)"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>
