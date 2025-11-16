@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="emergency-alerts-test-suite.xml" />
+
+    <!-- Test Suite for Environmental Emergency Alerts Endpoints -->
+
+    <!-- Test: Create Emergency Alert - Success -->
+    <munit:test name="create-emergency-alert-success-test"
+                description="Test successful creation of an environmental emergency alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "emergencyType": "WATER_QUALITY_EXCEEDANCE",
+  "severity": "CRITICAL",
+  "affectedPopulation": 125000,
+  "triggerCondition": "E. coli detected in treated water",
+  "location": {
+    "latitude": 33.7490,
+    "longitude": -84.3880
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(201)]"
+                message="Expected HTTP 201 Created status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.alertId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alert to have alertId"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityId]"
+                is="#[MunitTools::equalTo('FACILITY_001')]"
+                message="Expected facilityId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected severity to be CRITICAL"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get All Emergency Alerts - Success -->
+    <munit:test name="get-all-emergency-alerts-success-test"
+                description="Test successful retrieval of all emergency alerts">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected payload to not be null"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Emergency Alerts - Filter by Severity -->
+    <munit:test name="get-emergency-alerts-filter-by-severity-test"
+                description="Test filtering alerts by severity level">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"severity" : "CRITICAL"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Create Emergency Alert - Missing Required Fields -->
+    <munit:test name="create-emergency-alert-missing-fields-test"
+                description="Test error response when required fields are missing"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001"
+  // Missing required fields: emergencyType, severity, etc.
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Get Emergency Alerts with Time Range -->
+    <munit:test name="get-emergency-alerts-with-time-range-test"
+                description="Test filtering alerts by time range">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"startTime" : "2025-01-01T00:00:00Z",
+	"endTime" : "2025-12-31T23:59:59Z"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Emergency Alert - High Risk Threshold -->
+    <munit:test name="create-high-risk-emergency-alert-test"
+                description="Test creation of high-risk emergency alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "WASTE_FACILITY_002",
+  "emergencyType": "HAZMAT_SPILL",
+  "severity": "HIGH",
+  "affectedPopulation": 50000,
+  "triggerCondition": "Chemical spill detected in containment area",
+  "location": {
+    "latitude": 33.7590,
+    "longitude": -84.3780
+  },
+  "estimatedImpactRadius": 5.0
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(201)]"
+                message="Expected HTTP 201 Created status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emergencyType]"
+                is="#[MunitTools::equalTo('HAZMAT_SPILL')]"
+                message="Expected emergencyType to be HAZMAT_SPILL"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

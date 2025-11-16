@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="environmental-facilities-test-suite.xml" />
+
+    <!-- Test Suite for Environmental Facilities Endpoints -->
+
+    <!-- Test: Get All Environmental Facilities - Success -->
+    <munit:test name="get-all-environmental-facilities-success-test"
+                description="Test successful retrieval of all environmental facilities">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[sizeOf(payload)]"
+                is="#[MunitTools::greaterThan(0)]"
+                message="Expected at least one facility in response"/>
+
+            <munit-tools:assert-that
+                expression="#[payload[0].facilityId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected facility to have facilityId"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Environmental Facility - Success -->
+    <munit:test name="get-single-environmental-facility-success-test"
+                description="Test successful retrieval of a single environmental facility">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityId]"
+                is="#[MunitTools::equalTo('FACILITY_001')]"
+                message="Expected facilityId to match requested ID"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityName]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected facility to have facilityName"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Environmental Facilities with Pagination -->
+    <munit:test name="get-environmental-facilities-with-pagination-test"
+                description="Test environmental facilities retrieval with pagination parameters">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"limit" : 5,
+	"offset" : 0
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[sizeOf(payload)]"
+                is="#[MunitTools::lessThanOrEqualTo(5)]"
+                message="Expected maximum of 5 facilities due to limit parameter"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Environmental Facilities - Filter by Type -->
+    <munit:test name="get-environmental-facilities-filter-by-type-test"
+                description="Test filtering facilities by type">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"facilityType" : "WATER_TREATMENT"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <!-- Verify all returned facilities are of the requested type -->
+            <munit-tools:assert-that
+                expression="#[payload[0].facilityType]"
+                is="#[MunitTools::equalTo('WATER_TREATMENT')]"
+                message="Expected all facilities to be WATER_TREATMENT type"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Facility - Not Found -->
+    <munit:test name="get-environmental-facility-not-found-test"
+                description="Test 404 response for non-existent facility"
+                expectedErrorType="HTTP:NOT_FOUND">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/NONEXISTENT_FACILITY">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+</mule>
