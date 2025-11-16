@@ -1,23 +1,23 @@
-📘 ChainSync Environmental Services Emergency Coordination Platform — Modular API Documentation
+# ChainSync Environmental Services Emergency Coordination Platform — Modular API Documentation
 
-🌍 Overview
+## Overview
 ChainSync is an enterprise-grade environmental services emergency coordination platform built on MuleSoft Anypoint Platform. It transforms reactive environmental response into predictive, automated coordination workflows for organizations in water, waste, remediation, and energy sectors.
 
-🏗️ Architectural Overview
+## Architectural Overview
 
                      ┌────────────────────────────────────────┐
                      │         ENVIRONMENTAL DATA SOURCES     │
                      │ ────────────────────────────────────── │
-                     │  🏭 Treatment Plants  🗄️ Waste Facilities │
-                     │  ⚡ Energy Systems    🌊 Distribution Nets │
+                     │  Treatment Plants    Waste Facilities  │
+                     │  Energy Systems      Distribution Nets │
                      └────────────┬───────────────────────────┘
                                   │
                                   ▼
                  ┌────────────────────────────────────────────────┐
                  │       MULESOFT ENVIRONMENTAL COORDINATION       │
                  │ ────────────────────────────────────────────── │
-                 │  🔄 Real-time Processing    ⚡ Risk Assessment  │
-                 │  🚨 Emergency Detection     📋 Compliance Engine │
+                 │  Real-time Processing    Risk Assessment       │
+                 │  Emergency Detection     Compliance Engine     │
                  └────────────┬───────────────┬──────────────────┘
                               │               │
           ┌───────────────────┘               └──────────────────┐
@@ -25,11 +25,12 @@ ChainSync is an enterprise-grade environmental services emergency coordination p
 ┌──────────────────────┐                              ┌─────────────────────┐
 │  REGULATORY AGENCIES  │                              │   SERVICE VEHICLES   │
 │ ──────────────────── │                              │ ─────────────────── │
-│  🏛️ EPA Integration   │                              │  🚛 Water Trucks     │
-│  🏥 Health Departments │                              │  🚚 Waste Haulers    │
-│  🔒 Compliance Tracking │                              │  🚨 Emergency Fleet  │
+│  EPA Integration      │                              │  Water Trucks        │
+│  Health Departments   │                              │  Waste Haulers       │
+│  Compliance Tracking  │                              │  Emergency Fleet     │
 └──────────────────────┘                              └─────────────────────┘
- 📡 API Quick Reference
+
+## API Quick Reference
 
 | Attribute        | Value                                            |
 ||--|
@@ -39,36 +40,36 @@ ChainSync is an enterprise-grade environmental services emergency coordination p
 | Auth Header  | `Authorization: Bearer <token>`                  |
 | Dev Console  | _Local dev console setup varies by environment_  |
 
-🧩 Modular API Endpoints
+## Modular API Endpoints
 
- 🏭 Environmental Facility Monitoring
+### Environmental Facility Monitoring
 http
 GET  /environmental-facilities
 GET  /environmental-facilities/{facilityId}
 
- 🚚 Environmental Service Vehicle Coordination
+### Environmental Service Vehicle Coordination
 http
 GET  /environmental-service-vehicles
 GET  /environmental-service-vehicles/{vehicleId}
 
- 🚨 Emergency Alerts
+### Emergency Alerts
 http
 GET   /environmental-emergency-alerts
 POST  /environmental-emergency-alerts
- 📋 Regulatory Compliance
+### Regulatory Compliance
 http
 GET   /regulatory-compliance
 POST  /regulatory-compliance
 
- 📡 Environmental Monitoring Stations
+### Environmental Monitoring Stations
 http
 GET  /environmental-data/{stationId}
 
- 🛠️ Platform Health Check
+### Platform Health Check
 http
 GET  /health
 
- 🛠️ Reusable Traits
+## Reusable Traits
 
 | Trait Alias         | Purpose                                         |
 ||-|
@@ -81,7 +82,7 @@ GET  /health
 | `vehicleFilterable`  | Filter by type, service area, availability     |
 | `alertFilterable`    | Filter alerts by severity and emergency type   |
 
- 📦 Modular Type Definitions
+## Modular Type Definitions
 
 | Type                             | Description                                      |
 |-|--|
@@ -93,7 +94,7 @@ GET  /health
 | `ErrorResponse`                  | Code, message, timestamp for service diagnostics |
 
 > All types are defined in `/types` with examples in `/examples`
- 📈 Emergency Alert Example
+## Emergency Alert Example
 
 bash
 curl -X POST https://api.chainsync.com/environmental-emergency-alerts -H "Content-Type: application/json" -H "Authorization: Bearer <your_token>" -d '{
@@ -104,33 +105,33 @@ curl -X POST https://api.chainsync.com/environmental-emergency-alerts -H "Conten
   "triggerCondition": "E. coli detected in treated water"
 }'
 
- 🌱 Environmental Coordination Features
+## Environmental Coordination Features
 
- Water Services
+### Water Services
 - Contamination response, public health alerts  
 - Infrastructure failures (pump breaks, pipe ruptures)  
 - Treatment plant equipment diagnostics  
 - Boil water advisories and emergency distributions
 
- Waste Services
+### Waste Services
 - Spill response and cleanup workflows  
 - Emission violations and incinerator failures  
 - Overflow detection and rerouting coordination  
 - Real-time regulatory reporting and threshold monitoring
 
- Vehicle Dispatch & Fleet Management
+### Vehicle Dispatch & Fleet Management
 - Service vehicle tracking (HAZMAT, mobile labs, tankers)  
 - Emergency fleet availability and coordination  
 - Field technician and equipment routing  
 - Geo-filters for localized dispatch decisions
 
- Regulatory Compliance Automation
+### Regulatory Compliance Automation
 - Automated EPA & State DEQ submissions  
 - Audit trail logging and inspection history  
 - Violation prevention via predictive alerts  
 - Integrated connectors for environmental agencies
 
- 🎯 Business Impact Summary
+## Business Impact Summary
 
 | Impact Area                | Highlights                                            |
 |-|-|
@@ -138,7 +139,7 @@ curl -X POST https://api.chainsync.com/environmental-emergency-alerts -H "Conten
 | Operational Efficiency | 70% faster response time, $5.2M+ in failure prevention |
 | Customer Protection    | 500K+ people protected, live alerts to communities    |
 
- 🧬 Technology Stack
+## Technology Stack
 
 | Component                 | Technology                        | Purpose                            |
 |--|||
@@ -150,14 +151,14 @@ curl -X POST https://api.chainsync.com/environmental-emergency-alerts -H "Conten
 | Regulatory Connectors| REST + Gov APIs                    | External agency communication      |
 | Fleet Tracking       | Real-time API + GIS filters        | Dispatch coordination              |
 
- 🔧 Target Applications
+## Target Applications
 
 - Water Treatment & Distribution  
 - Waste Management & Hazardous Response  
 - Environmental Remediation Services  
 - Energy Grid Environmental Compliance
 
- 🛡️ Compliance Standards
+## Compliance Standards
 
 | Type                        | Description                             |
 |--|--|
@@ -167,33 +168,33 @@ curl -X POST https://api.chainsync.com/environmental-emergency-alerts -H "Conten
 | ISO 14001 & ISO 45001       | Environmental + safety management       |
 | SWANA / AWWA Standards      | Industry-specific best practices        |
 
- 🏛️ Integration Partners
+## Integration Partners
 
- Government & Emergency
+### Government & Emergency
 - EPA regional offices  
 - State DEQ and PUC agencies  
 - Health departments  
 - Police / Fire / EMS  
 - Emergency management systems
 
- Industrial Systems
+### Industrial Systems
 - SCADA, LIMS, GIS, ERP  
 - Sensor streams and mobile lab apps  
 - Dispatch and asset management systems
 
- 👥 Team
+## Team
 
 | Role                   | Name                  |
 | Designer and Developer | Uma Madasu            |
 
- 🗺️ Product Roadmap
+## Product Roadmap
 
-- ✅ Phase 1: Facility and emergency coordination  
-- ✅ Phase 2: Vehicle dispatch and fleet tracking  
-- ✅ Phase 3: Regulatory automation  
-- 🔄 Phase 4: Predictive maintenance  
-- 📊 Phase 5: Carbon and environmental analytics  
-- 📡 Phase 6: IoT sensor integration  
+- [x] Phase 1: Facility and emergency coordination
+- [x] Phase 2: Vehicle dispatch and fleet tracking
+- [x] Phase 3: Regulatory automation
+- [ ] Phase 4: Predictive maintenance
+- [ ] Phase 5: Carbon and environmental analytics
+- [ ] Phase 6: IoT sensor integration
 
 ChainSync Environmental Services API — Protecting communities, powering operations, and automating compliance.
 _Made for environmental resilience. Engineered for scalable emergency coordination._

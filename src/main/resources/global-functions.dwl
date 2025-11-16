@@ -125,3 +125,158 @@ fun generateErrorResponse(code: String, message: String): Object = {
         timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
     }
 }
+
+/**
+ * Generates alert ID with timestamp
+ */
+fun generateAlertId(prefix: String, identifier: String): String =
+    prefix ++ "_" ++ identifier ++ "_" ++ now() as String {format: "yyyyMMdd_HHmmss"}
+
+/**
+ * Generates workflow ID with timestamp
+ */
+fun generateWorkflowId(prefix: String): String =
+    prefix ++ "_" ++ now() as String {format: "yyyyMMdd_HHmmss"}
+
+/**
+ * Generates meeting URL with timestamp
+ */
+fun generateMeetingUrl(baseUrl: String): String =
+    baseUrl ++ now() as String {format: "yyyyMMddHHmmss"}
+
+/**
+ * Determines alert level based on risk score
+ */
+fun determineAlertLevel(riskScore: Number): String =
+    if (riskScore >= 8) "CRITICAL"
+    else if (riskScore >= 6) "EMERGENCY"
+    else if (riskScore >= 4) "WARNING"
+    else "ADVISORY"
+
+/**
+ * Determines severity level based on risk score
+ */
+fun determineSeverity(riskScore: Number): String =
+    if (riskScore >= 8) "CRITICAL"
+    else if (riskScore >= 6) "HIGH"
+    else if (riskScore >= 4) "MEDIUM"
+    else "LOW"
+
+/**
+ * Estimates affected population based on location/city
+ */
+fun estimateAffectedPopulation(city: String): Number =
+    if (city == "New York" or city == "NYC") 125000
+    else if (city == "London") 200000
+    else if (city == "Beijing") 300000
+    else if (city == "Los Angeles" or city == "LA") 150000
+    else if (city == "Chicago") 100000
+    else if (city == "Atlanta") 75000
+    else 50000
+
+/**
+ * Generates coordination stakeholders based on alert level
+ */
+fun getCoordinationStakeholders(alertLevel: String): Array =
+    if (alertLevel == "CRITICAL") [
+        {name: "EPA Emergency Response", role: "Regulatory Authority"},
+        {name: "State Environmental Health", role: "Health Department"},
+        {name: "Local Emergency Management", role: "Emergency Coordination"},
+        {name: "Water Quality Director", role: "Technical Lead"},
+        {name: "Public Information Officer", role: "Communications"}
+    ]
+    else if (alertLevel == "EMERGENCY") [
+        {name: "State Environmental Health", role: "Health Department"},
+        {name: "Water Quality Director", role: "Technical Lead"},
+        {name: "Operations Manager", role: "Facility Operations"}
+    ]
+    else [
+        {name: "Water Quality Director", role: "Technical Lead"},
+        {name: "Operations Manager", role: "Facility Operations"}
+    ]
+
+/**
+ * Validates environmental reading is within safe thresholds
+ */
+fun isWithinSafeThreshold(value: Number, min: Number, max: Number): Boolean =
+    value >= min and value <= max
+
+/**
+ * Calculates environmental risk score based on multiple parameters
+ */
+fun calculateEnvironmentalRiskScore(aqi: Number, waterQuality: Object, weatherSeverity: Number): Number = do {
+    var aqiScore = if (aqi > 200) 4
+                   else if (aqi > 150) 3
+                   else if (aqi > 100) 2
+                   else if (aqi > 50) 1
+                   else 0
+
+    var waterScore = if (waterQuality.ph? and not isWithinSafeThreshold(waterQuality.ph, 6.5, 8.5)) 3
+                     else if (waterQuality.turbidity? and waterQuality.turbidity > 5.0) 2
+                     else if (waterQuality.do? and waterQuality.do < 5.0) 2
+                     else 0
+
+    var weatherScore = if (weatherSeverity >= 8) 3
+                       else if (weatherSeverity >= 5) 2
+                       else if (weatherSeverity >= 3) 1
+                       else 0
+    ---
+    aqiScore + waterScore + weatherScore
+}
+
+/**
+ * Formats facility ID to standard format
+ */
+fun formatFacilityId(facilityId: String): String =
+    upper(facilityId) replace /[^A-Z0-9_\-]/ with ""
+
+/**
+ * Generates incident ID with timestamp and facility
+ */
+fun generateIncidentId(facilityId: String): String =
+    "INC_" ++ formatFacilityId(facilityId) ++ "_" ++ now() as String {format: "yyyyMMddHHmmss"}
+
+/**
+ * Determines if coordination is required based on risk score
+ */
+fun isCoordinationRequired(riskScore: Number): Boolean =
+    riskScore >= 6
+
+/**
+ * Generates response actions based on alert level
+ */
+fun generateResponseActions(alertLevel: String, emergencyType: String): Array =
+    if (alertLevel == "CRITICAL") [
+        "Immediate facility shutdown if necessary",
+        "Activate emergency response team",
+        "Notify regulatory authorities (EPA/DEQ)",
+        "Issue public advisory/boil water notice",
+        "Deploy emergency equipment and personnel",
+        "Establish incident command center"
+    ]
+    else if (alertLevel == "EMERGENCY") [
+        "Increase monitoring frequency",
+        "Activate response protocols",
+        "Notify operations management",
+        "Prepare contingency resources",
+        "Alert nearby facilities"
+    ]
+    else if (alertLevel == "WARNING") [
+        "Enhanced monitoring",
+        "Review operational parameters",
+        "Prepare response team for standby",
+        "Document conditions"
+    ]
+    else [
+        "Continue routine monitoring",
+        "Document for trend analysis"
+    ]
+
+/**
+ * Calculates estimated response time based on severity and distance
+ */
+fun estimateResponseTime(severity: String, distanceKm: Number): Number =
+    if (severity == "CRITICAL") 15 + (distanceKm * 2)
+    else if (severity == "HIGH") 30 + (distanceKm * 3)
+    else if (severity == "MEDIUM") 60 + (distanceKm * 4)
+    else 120 + (distanceKm * 5)
