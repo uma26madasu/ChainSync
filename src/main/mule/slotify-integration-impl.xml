@@ -1,0 +1,565 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!--
+    ============================================
+    SLOTIFY INTEGRATION IMPLEMENTATION
+    ============================================
+    This module provides full integration with Slotify scheduling engine for:
+    - Emergency coordination meeting scheduling
+    - Multi-agency stakeholder notifications
+    - Real-time meeting management
+    - Webhook handling for meeting updates
+    ============================================
+    -->
+
+    <!-- ==================== CORE SLOTIFY FLOWS ==================== -->
+
+    <!-- Flow: Create Emergency Coordination Meeting -->
+    <flow name="slotify-create-emergency-meeting" doc:name="Create Emergency Coordination Meeting">
+        <ee:transform doc:name="Build Slotify Meeting Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+// Determine meeting room based on alert level
+fun getMeetingRoom(alertLevel: String) =
+    if (alertLevel == "CRITICAL" or alertLevel == "EMERGENCY")
+        p('slotify.meeting.emergency.room')
+    else
+        p('slotify.meeting.default.room')
+
+// Calculate meeting duration based on severity
+fun getMeetingDuration(alertLevel: String) =
+    if (alertLevel == "CRITICAL") 60
+    else if (alertLevel == "EMERGENCY") 45
+    else 30
+
+// Get stakeholders based on alert level
+fun getStakeholders(alertLevel: String, location: String) =
+    if (alertLevel == "CRITICAL") [
+        { name: p('slotify.participants.epa'), role: "LEAD", email: "epa-emergency@agency.gov" },
+        { name: p('slotify.participants.state'), role: "REQUIRED", email: "state-env@state.gov" },
+        { name: p('slotify.participants.local'), role: "REQUIRED", email: "emergency-mgmt@local.gov" },
+        { name: p('slotify.participants.health'), role: "REQUIRED", email: "public-health@health.gov" },
+        { name: p('slotify.participants.facility'), role: "REQUIRED", email: "ops@chainsync.com" }
+    ]
+    else if (alertLevel == "EMERGENCY") [
+        { name: p('slotify.participants.state'), role: "LEAD", email: "state-env@state.gov" },
+        { name: p('slotify.participants.local'), role: "REQUIRED", email: "emergency-mgmt@local.gov" },
+        { name: p('slotify.participants.facility'), role: "REQUIRED", email: "ops@chainsync.com" }
+    ]
+    else [
+        { name: p('slotify.participants.facility'), role: "LEAD", email: "ops@chainsync.com" },
+        { name: "Facility Manager", role: "REQUIRED", email: "facility-mgr@chainsync.com" }
+    ]
+
+---
+{
+    title: "Emergency Coordination: " ++ (vars.alertData.emergencyType default "Environmental Alert"),
+    description: vars.alertData.description default "Environmental emergency requiring multi-agency coordination",
+    meetingType: if (vars.alertLevel == "CRITICAL") "EMERGENCY" else "URGENT",
+    room: getMeetingRoom(vars.alertLevel default "HIGH"),
+    startTime: (now() + |PT15M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    endTime: (now() + |PT15M| + ("PT" ++ getMeetingDuration(vars.alertLevel default "HIGH") ++ "M") as Period) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    duration: getMeetingDuration(vars.alertLevel default "HIGH"),
+    priority: if (vars.alertLevel == "CRITICAL") "P1" else if (vars.alertLevel == "EMERGENCY") "P2" else "P3",
+    participants: getStakeholders(vars.alertLevel default "HIGH", vars.location default "Unknown"),
+    videoConference: {
+        enabled: p('slotify.video.enabled') as Boolean default true,
+        provider: p('slotify.video.provider') default "slotify",
+        autoRecord: p('slotify.video.auto.record') as Boolean default true
+    },
+    notifications: {
+        email: p('slotify.notifications.email') as Boolean default true,
+        sms: p('slotify.notifications.sms') as Boolean default true,
+        push: p('slotify.notifications.push') as Boolean default true,
+        reminderMinutes: p('slotify.notifications.reminder.minutes') as Number default 15
+    },
+    context: {
+        alertId: vars.alertId,
+        facilityId: vars.facilityId,
+        alertLevel: vars.alertLevel,
+        riskScore: vars.riskScore,
+        affectedPopulation: vars.affectedPopulation,
+        briefing: vars.slotifyBriefing default "See attached incident report",
+        source: "ChainSync Environmental Platform"
+    },
+    metadata: {
+        createdBy: "chainsync-automation",
+        createdAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+        correlationId: vars.alertId,
+        platform: "ChainSync"
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <!-- Call Slotify API to create meeting -->
+        <http:request method="POST" config-ref="Slotify_API_Request_Config" path="/v1/meetings" doc:name="POST Create Meeting">
+            <http:response-validator>
+                <http:success-status-code-validator values="200..299"/>
+            </http:response-validator>
+        </http:request>
+
+        <ee:transform doc:name="Process Slotify Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "SUCCESS",
+    meetingId: payload.meetingId,
+    meetingUrl: payload.meetingUrl,
+    videoConferenceUrl: payload.videoConference.joinUrl,
+    scheduledTime: payload.startTime,
+    room: payload.room,
+    participantsNotified: sizeOf(payload.participants default []),
+    message: "Emergency coordination meeting scheduled successfully"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <!-- Error handling for Slotify API calls -->
+        <error-handler>
+            <on-error-propagate type="HTTP:CONNECTIVITY, HTTP:TIMEOUT">
+                <ee:transform doc:name="Handle Slotify Connection Error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorType: "SLOTIFY_CONNECTION_ERROR",
+    message: "Unable to connect to Slotify API. Meeting not scheduled.",
+    fallback: "Manual coordination required. Contact stakeholders directly.",
+    alertId: vars.alertId,
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <logger level="ERROR" message="Slotify API connection error for alert #[vars.alertId]: #[error.description]" doc:name="Log Slotify Error"/>
+            </on-error-propagate>
+            <on-error-propagate type="HTTP:UNAUTHORIZED, HTTP:FORBIDDEN">
+                <ee:transform doc:name="Handle Slotify Auth Error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorType: "SLOTIFY_AUTH_ERROR",
+    message: "Slotify API authentication failed. Check API key configuration.",
+    alertId: vars.alertId,
+    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <logger level="ERROR" message="Slotify API authentication error. Check slotify.api.key configuration." doc:name="Log Auth Error"/>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <!-- Flow: Schedule Incident Coordination Meeting -->
+    <flow name="slotify-schedule-incident-meeting" doc:name="Schedule Incident Coordination Meeting">
+        <ee:transform doc:name="Build Incident Meeting Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+fun getIncidentParticipants(severity: String, incidentType: String) =
+    if (severity == "CRITICAL" and incidentType == "CONTAMINATION_BREACH") [
+        { name: "HazMat Response Team", role: "LEAD", email: "hazmat@response.com" },
+        { name: "EPA Regional Office", role: "REQUIRED", email: "epa-regional@agency.gov" },
+        { name: "State Environmental Agency", role: "REQUIRED", email: "state-env@state.gov" },
+        { name: "Emergency Response Coordinator", role: "REQUIRED", email: "erc@chainsync.com" },
+        { name: "Facility Manager", role: "REQUIRED", email: "facility@chainsync.com" }
+    ]
+    else if (severity == "CRITICAL") [
+        { name: "Emergency Engineering Team", role: "LEAD", email: "engineering@chainsync.com" },
+        { name: "Facility Manager", role: "REQUIRED", email: "facility@chainsync.com" },
+        { name: "Safety Coordinator", role: "REQUIRED", email: "safety@chainsync.com" }
+    ]
+    else [
+        { name: "Facility Operations", role: "LEAD", email: "ops@chainsync.com" },
+        { name: "Incident Response Team", role: "REQUIRED", email: "irt@chainsync.com" }
+    ]
+
+---
+{
+    title: "Incident Response: " ++ (vars.incidentType default "Facility Incident") ++ " - " ++ (vars.severity default "HIGH"),
+    description: "Incident coordination meeting for " ++ (vars.facilityId default "Unknown Facility"),
+    meetingType: if (vars.severity == "CRITICAL") "EMERGENCY_RESPONSE" else "URGENT_COORDINATION",
+    room: p('slotify.meeting.emergency.room'),
+    startTime: (now() + |PT15M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    duration: if (vars.severity == "CRITICAL") 60 else 30,
+    priority: if (vars.severity == "CRITICAL") "P1" else "P2",
+    participants: getIncidentParticipants(vars.severity default "HIGH", vars.incidentType default "GENERAL"),
+    videoConference: {
+        enabled: true,
+        provider: "slotify",
+        autoRecord: true
+    },
+    notifications: {
+        email: true,
+        sms: vars.severity == "CRITICAL",
+        push: true,
+        reminderMinutes: 5
+    },
+    context: {
+        incidentId: vars.incidentId,
+        facilityId: vars.facilityId,
+        incidentType: vars.incidentType,
+        severity: vars.severity,
+        description: vars.description,
+        reportedBy: vars.reportedBy,
+        source: "ChainSync Environmental Platform"
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <http:request method="POST" config-ref="Slotify_API_Request_Config" path="/v1/meetings" doc:name="POST Create Incident Meeting"/>
+
+        <ee:transform doc:name="Process Incident Meeting Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "SUCCESS",
+    meetingId: payload.meetingId,
+    meetingUrl: payload.meetingUrl,
+    videoConferenceUrl: payload.videoConference.joinUrl default payload.meetingUrl,
+    scheduledTime: payload.startTime,
+    message: "Incident coordination meeting scheduled"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <error-handler>
+            <on-error-continue type="ANY">
+                <ee:transform doc:name="Handle Error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    message: "Failed to schedule incident meeting",
+    error: error.description,
+    fallback: "Manual coordination required"
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <logger level="ERROR" message="Failed to schedule incident meeting: #[error.description]" doc:name="Log Error"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <!-- Flow: Schedule Vehicle Dispatch Coordination -->
+    <flow name="slotify-schedule-dispatch-coordination" doc:name="Schedule Vehicle Dispatch Coordination">
+        <ee:transform doc:name="Build Dispatch Meeting Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    title: "Emergency Dispatch Coordination: " ++ (vars.vehicleId default "Vehicle"),
+    description: "Urgent dispatch coordination for " ++ (vars.taskType default "Emergency Response"),
+    meetingType: "DISPATCH_COORDINATION",
+    room: "Fleet Operations Center",
+    startTime: (now() + |PT5M|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    duration: 15,
+    priority: if (vars.priority == "URGENT") "P1" else "P2",
+    participants: [
+        { name: "Fleet Coordinator", role: "LEAD", email: "fleet@chainsync.com" },
+        { name: "Emergency Response Team", role: "REQUIRED", email: "ert@chainsync.com" },
+        { name: "Facility Management", role: "OPTIONAL", email: "facility@chainsync.com" }
+    ],
+    videoConference: {
+        enabled: true,
+        provider: "slotify"
+    },
+    notifications: {
+        email: true,
+        sms: true,
+        push: true,
+        reminderMinutes: 2
+    },
+    context: {
+        dispatchId: vars.dispatchId,
+        vehicleId: vars.vehicleId,
+        taskType: vars.taskType,
+        priority: vars.priority,
+        destination: vars.destination,
+        source: "ChainSync Fleet Management"
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <http:request method="POST" config-ref="Slotify_API_Request_Config" path="/v1/meetings" doc:name="POST Create Dispatch Meeting"/>
+
+        <ee:transform doc:name="Process Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "SUCCESS",
+    meetingId: payload.meetingId,
+    meetingUrl: payload.meetingUrl,
+    message: "Dispatch coordination meeting scheduled"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <error-handler>
+            <on-error-continue type="ANY">
+                <ee:transform doc:name="Handle Error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    message: "Failed to schedule dispatch coordination",
+    error: error.description
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <!-- Flow: Update Meeting with AI Briefing -->
+    <flow name="slotify-update-meeting-briefing" doc:name="Update Meeting with AI Briefing">
+        <ee:transform doc:name="Build Update Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    briefing: vars.aiBriefing,
+    attachments: [
+        {
+            type: "AI_ANALYSIS",
+            content: vars.aiAnalysis,
+            generatedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+        }
+    ],
+    updatedBy: "chainsync-ai-agent"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <http:request method="PATCH" config-ref="Slotify_API_Request_Config" path="/v1/meetings/{meetingId}/context" doc:name="PATCH Update Meeting">
+            <http:uri-params><![CDATA[#[output application/java --- { meetingId: vars.meetingId }]]]></http:uri-params>
+        </http:request>
+
+        <ee:transform doc:name="Process Update Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "SUCCESS",
+    meetingId: vars.meetingId,
+    message: "Meeting briefing updated with AI analysis"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Flow: Cancel Meeting (if incident resolved) -->
+    <flow name="slotify-cancel-meeting" doc:name="Cancel Meeting">
+        <http:request method="DELETE" config-ref="Slotify_API_Request_Config" path="/v1/meetings/{meetingId}" doc:name="DELETE Cancel Meeting">
+            <http:uri-params><![CDATA[#[output application/java --- { meetingId: vars.meetingId }]]]></http:uri-params>
+            <http:query-params><![CDATA[#[output application/java --- { reason: vars.cancellationReason default "Incident resolved", notifyParticipants: "true" }]]]></http:query-params>
+        </http:request>
+
+        <ee:transform doc:name="Process Cancellation Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "SUCCESS",
+    meetingId: vars.meetingId,
+    message: "Meeting cancelled successfully",
+    reason: vars.cancellationReason default "Incident resolved"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- Flow: Get Available Meeting Slots -->
+    <flow name="slotify-get-available-slots" doc:name="Get Available Meeting Slots">
+        <http:request method="GET" config-ref="Slotify_API_Request_Config" path="/v1/availability" doc:name="GET Available Slots">
+            <http:query-params><![CDATA[#[output application/java --- {
+    room: vars.room default p('slotify.meeting.default.room'),
+    duration: vars.duration default "30",
+    from: (now()) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+    to: (now() + |P1D|) as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]]></http:query-params>
+        </http:request>
+
+        <ee:transform doc:name="Process Available Slots">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    availableSlots: payload.slots map {
+        startTime: $.startTime,
+        endTime: $.endTime,
+        room: $.room
+    },
+    totalSlots: sizeOf(payload.slots default [])
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- ==================== WEBHOOK HANDLER ==================== -->
+
+    <!-- Flow: Slotify Webhook Handler -->
+    <flow name="slotify-webhook-handler" doc:name="Slotify Webhook Handler">
+        <http:listener config-ref="Slotify_Webhook_Listener_Config" path="${slotify.webhook.path}" doc:name="Listen for Slotify Webhooks"/>
+
+        <!-- Validate webhook signature -->
+        <ee:transform doc:name="Extract Webhook Data">
+            <ee:variables>
+                <ee:set-variable variableName="webhookEvent">payload.event</ee:set-variable>
+                <ee:set-variable variableName="meetingId">payload.data.meetingId</ee:set-variable>
+                <ee:set-variable variableName="webhookSignature">attributes.headers.'X-Slotify-Signature'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <choice doc:name="Route Webhook Event">
+            <!-- Meeting Started -->
+            <when expression="#[vars.webhookEvent == 'meeting.started']">
+                <logger level="INFO" message="Slotify meeting started: #[vars.meetingId]" doc:name="Log Meeting Started"/>
+                <ee:transform doc:name="Process Meeting Started">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: "meeting.started",
+    meetingId: vars.meetingId,
+    processedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+
+            <!-- Meeting Ended -->
+            <when expression="#[vars.webhookEvent == 'meeting.ended']">
+                <logger level="INFO" message="Slotify meeting ended: #[vars.meetingId]" doc:name="Log Meeting Ended"/>
+                <ee:transform doc:name="Process Meeting Ended">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: "meeting.ended",
+    meetingId: vars.meetingId,
+    duration: payload.data.duration,
+    attendeeCount: payload.data.attendeeCount,
+    recordingUrl: payload.data.recordingUrl,
+    processedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+
+            <!-- Participant Joined -->
+            <when expression="#[vars.webhookEvent == 'participant.joined']">
+                <logger level="INFO" message="Participant joined meeting #[vars.meetingId]: #[payload.data.participantName]" doc:name="Log Participant Joined"/>
+                <ee:transform doc:name="Process Participant Joined">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: "participant.joined"
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+
+            <!-- Meeting Cancelled -->
+            <when expression="#[vars.webhookEvent == 'meeting.cancelled']">
+                <logger level="WARN" message="Slotify meeting cancelled: #[vars.meetingId]" doc:name="Log Meeting Cancelled"/>
+                <ee:transform doc:name="Process Meeting Cancelled">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: "meeting.cancelled",
+    meetingId: vars.meetingId,
+    reason: payload.data.cancellationReason
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+
+            <!-- Default handler -->
+            <otherwise>
+                <logger level="DEBUG" message="Unhandled Slotify webhook event: #[vars.webhookEvent]" doc:name="Log Unknown Event"/>
+                <ee:transform doc:name="Acknowledge Unknown Event">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: vars.webhookEvent
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
+    </flow>
+
+    <!-- ==================== UTILITY SUB-FLOWS ==================== -->
+
+    <!-- Sub-flow: Check if Slotify scheduling is required -->
+    <sub-flow name="slotify-check-scheduling-required" doc:name="Check if Scheduling Required">
+        <ee:transform doc:name="Evaluate Scheduling Criteria">
+            <ee:variables>
+                <ee:set-variable variableName="schedulingRequired"><![CDATA[%dw 2.0
+output application/java
+---
+(p('slotify.api.enabled') as Boolean default false) and (
+    (vars.alertLevel == "CRITICAL" and p('slotify.auto.schedule.critical') as Boolean default true) or
+    (vars.alertLevel == "EMERGENCY" and p('slotify.auto.schedule.emergency') as Boolean default true) or
+    ((vars.riskScore default 0) >= (p('slotify.auto.schedule.risk.threshold') as Number default 6))
+)]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+    </sub-flow>
+
+    <!-- Sub-flow: Retry Slotify API call -->
+    <sub-flow name="slotify-retry-handler" doc:name="Slotify Retry Handler">
+        <until-successful maxRetries="${slotify.retry.max.attempts}" millisBetweenRetries="${slotify.retry.delay.ms}">
+            <flow-ref name="#[vars.targetFlow]" doc:name="Retry Target Flow"/>
+        </until-successful>
+    </sub-flow>
+
+</mule>

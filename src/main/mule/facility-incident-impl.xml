@@ -197,7 +197,57 @@ fun generateImmediateActions(incidentType: String, severity: String) =
                 <choice doc:name="Trigger Emergency Response">
                     <when expression="#[vars.severity == 'CRITICAL' or (vars.severity == 'HIGH' and vars.incidentType == 'CONTAMINATION_BREACH')]">
                         <logger level="ERROR" message="CRITICAL incident - triggering emergency coordination for facility #[vars.facilityId]" doc:name="Log Emergency Response"/>
-                        <!-- Here you would integrate with emergency response systems -->
+
+                        <!-- Store current payload for restoration after Slotify call -->
+                        <ee:transform doc:name="Store Incident Response">
+                            <ee:variables>
+                                <ee:set-variable variableName="incidentResponse">payload</ee:set-variable>
+                            </ee:variables>
+                        </ee:transform>
+
+                        <!-- Call Slotify to schedule incident coordination meeting -->
+                        <try doc:name="Try Slotify Incident Integration">
+                            <flow-ref name="slotify-schedule-incident-meeting" doc:name="Schedule Slotify Incident Meeting"/>
+
+                            <!-- Merge Slotify response with incident response -->
+                            <ee:transform doc:name="Merge Incident Slotify Response">
+                                <ee:message>
+                                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.incidentResponse ++ {
+    slotifyIntegration: vars.incidentResponse.slotifyIntegration ++ {
+        status: payload.status,
+        meetingId: payload.meetingId,
+        meetingUrl: payload.meetingUrl,
+        videoConferenceUrl: payload.videoConferenceUrl,
+        scheduledTime: payload.scheduledTime,
+        message: payload.message
+    }
+}]]></ee:set-payload>
+                                </ee:message>
+                            </ee:transform>
+
+                            <error-handler>
+                                <on-error-continue type="ANY">
+                                    <logger level="WARN" message="Slotify integration failed for incident, continuing: #[error.description]" doc:name="Log Incident Slotify Failure"/>
+                                    <ee:transform doc:name="Restore Incident Response with Error">
+                                        <ee:message>
+                                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.incidentResponse ++ {
+    slotifyIntegration: vars.incidentResponse.slotifyIntegration ++ {
+        status: "ERROR",
+        message: "Slotify scheduling failed - manual coordination required",
+        error: error.description default "Unknown error"
+    }
+}]]></ee:set-payload>
+                                        </ee:message>
+                                    </ee:transform>
+                                </on-error-continue>
+                            </error-handler>
+                        </try>
                     </when>
                     <otherwise>
                         <logger level="INFO" message="Standard incident processing - assigned to #[assignResponseTeam(vars.incidentType, vars.severity)]" doc:name="Log Standard Processing"/>

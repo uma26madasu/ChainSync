@@ -8,7 +8,9 @@
         "external-api-config.xml",
         "fleet-environmental-coordination.xml",
         "fleet-monitoring-api.xml",
-        "global.xml"
+        "global.xml",
+        "slotify-config.xml",
+        "slotify-integration-impl.xml"
     ],
     "redeploymentEnabled": true,
     "classLoaderModelLoaderDescriptor": {
@@ -17,7 +19,8 @@
             "exportedPackages": [],
             "exportedResources": [
                 "api/chainsync-platform-api.raml",
-                "api/examples/environmental-data-example.json"
+                "api/examples/environmental-data-example.json",
+                "api/types/SlotifyTypes.raml"
             ]
         },
         "id": "mule"
@@ -39,6 +42,8 @@
         "weather.api.key",
         "regulatory.api.token",
         "ais.api.key",
-        "blockchain.private.key"
+        "blockchain.private.key",
+        "slotify.api.key",
+        "slotify.webhook.secret"
     ]
 }

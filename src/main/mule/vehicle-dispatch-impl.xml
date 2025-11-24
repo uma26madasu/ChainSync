@@ -128,7 +128,65 @@ fun generateDispatchMessage(taskType: String, priority: String) =
                 <choice doc:name="Trigger Coordination if Needed">
                     <when expression="#[vars.priority == 'URGENT' or vars.priority == 'HIGH']">
                         <logger level="WARN" message="High priority dispatch - triggering coordination workflow for vehicle #[vars.vehicleId]" doc:name="Log Coordination Trigger"/>
-                        <!-- Here you would integrate with Slotify or other coordination systems -->
+
+                        <!-- Store current payload for restoration after Slotify call -->
+                        <ee:transform doc:name="Store Dispatch Response">
+                            <ee:variables>
+                                <ee:set-variable variableName="dispatchResponse">payload</ee:set-variable>
+                            </ee:variables>
+                        </ee:transform>
+
+                        <!-- Call Slotify to schedule dispatch coordination meeting -->
+                        <try doc:name="Try Slotify Dispatch Integration">
+                            <flow-ref name="slotify-schedule-dispatch-coordination" doc:name="Schedule Slotify Dispatch Meeting"/>
+
+                            <!-- Merge Slotify response with dispatch response -->
+                            <ee:transform doc:name="Merge Dispatch Slotify Response">
+                                <ee:message>
+                                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.dispatchResponse ++ {
+    coordinationWorkflow: vars.dispatchResponse.coordinationWorkflow ++ {
+        slotifyIntegration: {
+            enabled: true,
+            status: payload.status,
+            meetingId: payload.meetingId,
+            meetingUrl: payload.meetingUrl,
+            meetingScheduled: payload.status == "SUCCESS",
+            coordinatingAgencies: ["Environmental Response Team", "Emergency Services", "Facility Management"],
+            message: payload.message
+        }
+    }
+}]]></ee:set-payload>
+                                </ee:message>
+                            </ee:transform>
+
+                            <error-handler>
+                                <on-error-continue type="ANY">
+                                    <logger level="WARN" message="Slotify integration failed for dispatch, continuing: #[error.description]" doc:name="Log Dispatch Slotify Failure"/>
+                                    <ee:transform doc:name="Restore Dispatch Response with Error">
+                                        <ee:message>
+                                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.dispatchResponse ++ {
+    coordinationWorkflow: vars.dispatchResponse.coordinationWorkflow ++ {
+        slotifyIntegration: {
+            enabled: true,
+            status: "ERROR",
+            meetingScheduled: false,
+            coordinatingAgencies: ["Environmental Response Team", "Emergency Services", "Facility Management"],
+            message: "Slotify scheduling failed - manual coordination required",
+            error: error.description default "Unknown error"
+        }
+    }
+}]]></ee:set-payload>
+                                        </ee:message>
+                                    </ee:transform>
+                                </on-error-continue>
+                            </error-handler>
+                        </try>
                     </when>
                     <otherwise>
                         <logger level="INFO" message="Standard dispatch - no coordination workflow needed" doc:name="Log Standard Dispatch"/>

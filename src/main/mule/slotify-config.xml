@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:sockets="http://www.mulesoft.org/schema/mule/sockets"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/sockets http://www.mulesoft.org/schema/mule/sockets/current/mule-sockets.xsd">
+
+    <!--
+    ============================================
+    SLOTIFY API HTTP REQUEST CONFIGURATION
+    ============================================
+    Slotify is the scheduling engine for automated stakeholder coordination.
+    This configuration provides HTTP connectivity to the Slotify API for:
+    - Creating and managing meetings
+    - Scheduling emergency coordination sessions
+    - Managing participants and notifications
+    - Handling meeting room reservations
+    ============================================
+    -->
+
+    <!-- Slotify API Request Configuration -->
+    <http:request-config name="Slotify_API_Request_Config" doc:name="Slotify API HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="${slotify.api.url}" port="443">
+            <http:client-socket-properties>
+                <sockets:tcp-client-socket-properties
+                    connectionTimeout="${slotify.api.timeout}"
+                    clientTimeout="${slotify.api.timeout}"/>
+            </http:client-socket-properties>
+        </http:request-connection>
+        <http:default-headers>
+            <http:default-header key="Authorization" value="Bearer ${slotify.api.key}"/>
+            <http:default-header key="Content-Type" value="application/json"/>
+            <http:default-header key="Accept" value="application/json"/>
+            <http:default-header key="X-API-Version" value="${slotify.api.version}"/>
+            <http:default-header key="X-Client-ID" value="chainsync-platform"/>
+        </http:default-headers>
+    </http:request-config>
+
+    <!-- Slotify Webhook Listener Configuration (for receiving callbacks) -->
+    <http:listener-config name="Slotify_Webhook_Listener_Config" doc:name="Slotify Webhook Listener Config">
+        <http:listener-connection host="0.0.0.0" port="${http.port}"/>
+    </http:listener-config>
+
+</mule>
