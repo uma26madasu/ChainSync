@@ -349,7 +349,68 @@ fun estimateAffectedPopulation(location: String) =
                 <choice doc:name="Trigger Emergency Coordination">
                     <when expression="#[vars.alertLevel == 'CRITICAL' or vars.alertLevel == 'EMERGENCY']">
                         <logger level="ERROR" message="CRITICAL/EMERGENCY alert - triggering multi-agency coordination for facility #[vars.facilityId]" doc:name="Log Emergency Coordination"/>
-                        <!-- Here you would integrate with Slotify emergency scheduling -->
+
+                        <!-- Store current payload for restoration after Slotify call -->
+                        <ee:transform doc:name="Store Alert Response">
+                            <ee:variables>
+                                <ee:set-variable variableName="alertResponse">payload</ee:set-variable>
+                                <ee:set-variable variableName="alertId">payload.alertId</ee:set-variable>
+                                <ee:set-variable variableName="riskScore">payload.environmentalRiskScore</ee:set-variable>
+                                <ee:set-variable variableName="affectedPopulation">payload.affectedPopulation</ee:set-variable>
+                                <ee:set-variable variableName="location">payload.facilityName</ee:set-variable>
+                                <ee:set-variable variableName="alertData">{
+                                    emergencyType: payload.emergencyType,
+                                    description: payload.triggerCondition
+                                }</ee:set-variable>
+                                <ee:set-variable variableName="slotifyBriefing">"Alert: " ++ payload.alertLevel ++ " - " ++ payload.emergencyType ++ ". Risk Score: " ++ (payload.environmentalRiskScore as String) ++ ". Affected Population: " ++ (payload.affectedPopulation as String) ++ ". Immediate coordination required."</ee:set-variable>
+                            </ee:variables>
+                        </ee:transform>
+
+                        <!-- Call Slotify to schedule emergency coordination meeting -->
+                        <try doc:name="Try Slotify Integration">
+                            <flow-ref name="slotify-create-emergency-meeting" doc:name="Schedule Slotify Emergency Meeting"/>
+
+                            <!-- Merge Slotify response with alert response -->
+                            <ee:transform doc:name="Merge Slotify Response">
+                                <ee:message>
+                                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.alertResponse ++ {
+    slotifyIntegration: {
+        status: payload.status,
+        meetingId: payload.meetingId,
+        meetingUrl: payload.meetingUrl,
+        videoConferenceUrl: payload.videoConferenceUrl,
+        scheduledTime: payload.scheduledTime,
+        room: payload.room,
+        participantsNotified: payload.participantsNotified,
+        message: payload.message
+    }
+}]]></ee:set-payload>
+                                </ee:message>
+                            </ee:transform>
+
+                            <error-handler>
+                                <on-error-continue type="ANY">
+                                    <logger level="WARN" message="Slotify integration failed, continuing with alert creation: #[error.description]" doc:name="Log Slotify Failure"/>
+                                    <ee:transform doc:name="Restore Alert Response with Error">
+                                        <ee:message>
+                                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.alertResponse ++ {
+    slotifyIntegration: {
+        status: "ERROR",
+        message: "Slotify scheduling failed - manual coordination required",
+        error: error.description default "Unknown error"
+    }
+}]]></ee:set-payload>
+                                        </ee:message>
+                                    </ee:transform>
+                                </on-error-continue>
+                            </error-handler>
+                        </try>
                     </when>
                     <otherwise>
                         <logger level="INFO" message="Warning alert created - standard monitoring protocols apply" doc:name="Log Standard Alert"/>

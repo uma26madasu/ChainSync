@@ -1,0 +1,387 @@
+#%RAML 1.0 DataType
+
+# ============================================
+# SLOTIFY INTEGRATION TYPE DEFINITIONS
+# ============================================
+# Types for Slotify scheduling engine integration
+# Used for emergency coordination meeting management
+# ============================================
+
+types:
+  # Core Meeting Types
+  SlotifyMeeting:
+    description: Represents a meeting scheduled through Slotify
+    type: object
+    properties:
+      meetingId:
+        type: string
+        description: Unique identifier for the meeting
+        example: "MTG_20251124_143025_ENV001"
+      title:
+        type: string
+        description: Meeting title
+        example: "Emergency Coordination: Water Contamination Event"
+      description:
+        type: string
+        required: false
+        description: Detailed meeting description
+      meetingType:
+        type: string
+        enum: [EMERGENCY, URGENT, STANDARD, DISPATCH_COORDINATION, EMERGENCY_RESPONSE, URGENT_COORDINATION]
+        description: Type of meeting
+      room:
+        type: string
+        description: Meeting room or location
+        example: "Environmental Ops Center"
+      startTime:
+        type: datetime
+        description: Meeting start time in ISO 8601 format
+      endTime:
+        type: datetime
+        description: Meeting end time in ISO 8601 format
+      duration:
+        type: integer
+        description: Meeting duration in minutes
+        example: 30
+      priority:
+        type: string
+        enum: [P1, P2, P3, P4]
+        description: Meeting priority level (P1 = highest)
+      status:
+        type: string
+        enum: [SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED]
+        description: Current meeting status
+      participants:
+        type: array
+        items: SlotifyParticipant
+        description: List of meeting participants
+      videoConference:
+        type: SlotifyVideoConference
+        required: false
+        description: Video conference settings
+      notifications:
+        type: SlotifyNotificationSettings
+        required: false
+        description: Notification preferences
+      context:
+        type: SlotifyMeetingContext
+        required: false
+        description: Contextual information for the meeting
+      metadata:
+        type: SlotifyMetadata
+        required: false
+        description: Meeting metadata
+
+  SlotifyParticipant:
+    description: Meeting participant information
+    type: object
+    properties:
+      name:
+        type: string
+        description: Participant name or team name
+        example: "EPA Emergency Response Team"
+      email:
+        type: string
+        description: Participant email address
+        example: "epa-emergency@agency.gov"
+      role:
+        type: string
+        enum: [LEAD, REQUIRED, OPTIONAL, OBSERVER]
+        description: Participant role in the meeting
+      organization:
+        type: string
+        required: false
+        description: Participant organization
+      notificationSent:
+        type: boolean
+        required: false
+        description: Whether notification was sent to participant
+      responseStatus:
+        type: string
+        enum: [PENDING, ACCEPTED, DECLINED, TENTATIVE]
+        required: false
+        description: Participant's response status
+
+  SlotifyVideoConference:
+    description: Video conference configuration
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        description: Whether video conference is enabled
+      provider:
+        type: string
+        enum: [slotify, zoom, teams, webex, google_meet]
+        description: Video conference provider
+      joinUrl:
+        type: string
+        required: false
+        description: URL to join the video conference
+      dialInNumber:
+        type: string
+        required: false
+        description: Dial-in phone number
+      meetingCode:
+        type: string
+        required: false
+        description: Meeting access code
+      autoRecord:
+        type: boolean
+        required: false
+        description: Whether to automatically record the meeting
+      recordingUrl:
+        type: string
+        required: false
+        description: URL to access meeting recording
+
+  SlotifyNotificationSettings:
+    description: Notification preferences for the meeting
+    type: object
+    properties:
+      email:
+        type: boolean
+        description: Send email notifications
+      sms:
+        type: boolean
+        description: Send SMS notifications
+      push:
+        type: boolean
+        description: Send push notifications
+      reminderMinutes:
+        type: integer
+        description: Minutes before meeting to send reminder
+        example: 15
+
+  SlotifyMeetingContext:
+    description: Contextual information linked to the meeting
+    type: object
+    properties:
+      alertId:
+        type: string
+        required: false
+        description: Related alert ID
+      incidentId:
+        type: string
+        required: false
+        description: Related incident ID
+      facilityId:
+        type: string
+        required: false
+        description: Related facility ID
+      alertLevel:
+        type: string
+        required: false
+        enum: [CRITICAL, EMERGENCY, WARNING, INFO]
+        description: Alert severity level
+      riskScore:
+        type: number
+        required: false
+        description: Environmental risk score (0-10)
+      affectedPopulation:
+        type: integer
+        required: false
+        description: Estimated affected population
+      briefing:
+        type: string
+        required: false
+        description: AI-generated briefing text
+      source:
+        type: string
+        required: false
+        description: Source system that created the meeting
+
+  SlotifyMetadata:
+    description: Meeting metadata
+    type: object
+    properties:
+      createdBy:
+        type: string
+        description: User or system that created the meeting
+      createdAt:
+        type: datetime
+        description: Creation timestamp
+      updatedAt:
+        type: datetime
+        required: false
+        description: Last update timestamp
+      correlationId:
+        type: string
+        required: false
+        description: Correlation ID for tracking
+      platform:
+        type: string
+        required: false
+        description: Source platform
+
+  # Request/Response Types
+  SlotifyCreateMeetingRequest:
+    description: Request to create a new meeting
+    type: object
+    properties:
+      title:
+        type: string
+        required: true
+      description:
+        type: string
+        required: false
+      meetingType:
+        type: string
+        required: true
+      room:
+        type: string
+        required: true
+      startTime:
+        type: datetime
+        required: true
+      duration:
+        type: integer
+        required: true
+      priority:
+        type: string
+        required: false
+      participants:
+        type: array
+        items: SlotifyParticipant
+        required: true
+      videoConference:
+        type: SlotifyVideoConference
+        required: false
+      notifications:
+        type: SlotifyNotificationSettings
+        required: false
+      context:
+        type: SlotifyMeetingContext
+        required: false
+
+  SlotifyMeetingResponse:
+    description: Response after creating or updating a meeting
+    type: object
+    properties:
+      status:
+        type: string
+        enum: [SUCCESS, ERROR]
+      meetingId:
+        type: string
+        required: false
+      meetingUrl:
+        type: string
+        required: false
+      videoConferenceUrl:
+        type: string
+        required: false
+      scheduledTime:
+        type: datetime
+        required: false
+      room:
+        type: string
+        required: false
+      participantsNotified:
+        type: integer
+        required: false
+      message:
+        type: string
+      errorType:
+        type: string
+        required: false
+      fallback:
+        type: string
+        required: false
+
+  SlotifyAvailabilitySlot:
+    description: Available time slot for scheduling
+    type: object
+    properties:
+      startTime:
+        type: datetime
+      endTime:
+        type: datetime
+      room:
+        type: string
+      available:
+        type: boolean
+
+  SlotifyAvailabilityResponse:
+    description: Response with available meeting slots
+    type: object
+    properties:
+      availableSlots:
+        type: array
+        items: SlotifyAvailabilitySlot
+      totalSlots:
+        type: integer
+
+  # Webhook Types
+  SlotifyWebhookEvent:
+    description: Webhook event from Slotify
+    type: object
+    properties:
+      event:
+        type: string
+        enum: [meeting.started, meeting.ended, meeting.cancelled, participant.joined, participant.left, recording.ready]
+      timestamp:
+        type: datetime
+      data:
+        type: SlotifyWebhookData
+
+  SlotifyWebhookData:
+    description: Data payload for webhook events
+    type: object
+    properties:
+      meetingId:
+        type: string
+      participantName:
+        type: string
+        required: false
+      participantEmail:
+        type: string
+        required: false
+      duration:
+        type: integer
+        required: false
+      attendeeCount:
+        type: integer
+        required: false
+      recordingUrl:
+        type: string
+        required: false
+      cancellationReason:
+        type: string
+        required: false
+
+  # Integration Status Types
+  SlotifyIntegrationStatus:
+    description: Status of Slotify integration for an alert or incident
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        description: Whether Slotify integration is enabled for this item
+      schedulingEnabled:
+        type: boolean
+        description: Whether automatic scheduling is enabled
+      meetingScheduled:
+        type: boolean
+        description: Whether a meeting has been scheduled
+      meetingId:
+        type: string
+        required: false
+        description: ID of scheduled meeting
+      meetingRoom:
+        type: string
+        description: Assigned meeting room
+      videoConference:
+        type: string
+        required: false
+        description: Video conference URL
+      participantNotifications:
+        type: boolean
+        description: Whether participant notifications are enabled
+      coordinationType:
+        type: string
+        required: false
+        enum: [EMERGENCY_RESPONSE, URGENT_COORDINATION, STANDARD_REVIEW]
+        description: Type of coordination
+      endpoint:
+        type: string
+        required: false
+        description: Slotify API endpoint used

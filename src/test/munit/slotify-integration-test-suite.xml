@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!--
+    ============================================
+    SLOTIFY INTEGRATION TEST SUITE
+    ============================================
+    MUnit tests for validating Slotify scheduling
+    engine integration in ChainSync platform.
+    ============================================
+    -->
+
+    <munit:config name="slotify-integration-test-suite.xml"/>
+
+    <!-- ==================== MOCK CONFIGURATIONS ==================== -->
+
+    <!-- Mock Slotify API Response for successful meeting creation -->
+    <munit:before-suite name="slotify-test-setup">
+        <munit-tools:mock-when processor="http:request" doc:name="Mock Slotify Create Meeting API">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                <munit-tools:with-attribute attributeName="path" whereValue="/v1/meetings"/>
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:payload value="#[output application/json --- {
+                    meetingId: 'MTG_TEST_' ++ now() as String {format: 'yyyyMMddHHmmss'},
+                    meetingUrl: 'https://slotify.io/meeting/test-meeting-id',
+                    videoConference: {
+                        joinUrl: 'https://slotify.io/video/test-meeting-id',
+                        dialInNumber: '+1-555-123-4567',
+                        meetingCode: '123456'
+                    },
+                    startTime: (now() + |PT15M|) as String {format: 'yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''},
+                    endTime: (now() + |PT75M|) as String {format: 'yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''},
+                    room: 'Environmental Ops Center',
+                    participants: [
+                        { name: 'EPA Emergency Response Team', status: 'NOTIFIED' },
+                        { name: 'State Environmental Agency', status: 'NOTIFIED' }
+                    ],
+                    status: 'SCHEDULED'
+                }]"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+    </munit:before-suite>
+
+    <!-- ==================== EMERGENCY MEETING TESTS ==================== -->
+
+    <munit:test name="test-create-emergency-meeting-critical-alert" doc:name="Test Create Emergency Meeting for Critical Alert">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {
+                        meetingId: 'MTG_CRITICAL_001',
+                        meetingUrl: 'https://slotify.io/meeting/critical-001',
+                        videoConference: { joinUrl: 'https://slotify.io/video/critical-001' },
+                        startTime: '2025-11-24T15:00:00Z',
+                        room: 'Incident Command Center',
+                        participants: [],
+                        status: 'SCHEDULED'
+                    }]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+
+            <set-variable variableName="alertLevel" value="CRITICAL" doc:name="Set Alert Level"/>
+            <set-variable variableName="alertId" value="ENV_ALERT_TEST_001" doc:name="Set Alert ID"/>
+            <set-variable variableName="facilityId" value="FAC_TEST_001" doc:name="Set Facility ID"/>
+            <set-variable variableName="riskScore" value="9" doc:name="Set Risk Score"/>
+            <set-variable variableName="affectedPopulation" value="125000" doc:name="Set Affected Population"/>
+            <set-variable variableName="location" value="Atlanta Water Treatment Facility" doc:name="Set Location"/>
+            <set-variable variableName="alertData" value="#[{emergencyType: 'CONTAMINATION_EVENT', description: 'E. coli detected above safe levels'}]" doc:name="Set Alert Data"/>
+            <set-variable variableName="slotifyBriefing" value="CRITICAL ALERT: Water contamination detected. Immediate coordination required." doc:name="Set Briefing"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <flow-ref name="slotify-create-emergency-meeting" doc:name="Call Create Emergency Meeting Flow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]" doc:name="Assert Success Status"/>
+            <munit-tools:assert-that expression="#[payload.meetingId]" is="#[MunitTools::notNullValue()]" doc:name="Assert Meeting ID Exists"/>
+            <munit-tools:assert-that expression="#[payload.meetingUrl]" is="#[MunitTools::containsString('slotify.io')]" doc:name="Assert Meeting URL Valid"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-create-emergency-meeting-emergency-alert" doc:name="Test Create Emergency Meeting for Emergency Alert">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {
+                        meetingId: 'MTG_EMERGENCY_001',
+                        meetingUrl: 'https://slotify.io/meeting/emergency-001',
+                        videoConference: { joinUrl: 'https://slotify.io/video/emergency-001' },
+                        startTime: '2025-11-24T15:30:00Z',
+                        room: 'Environmental Ops Center',
+                        participants: [],
+                        status: 'SCHEDULED'
+                    }]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+
+            <set-variable variableName="alertLevel" value="EMERGENCY" doc:name="Set Alert Level"/>
+            <set-variable variableName="alertId" value="ENV_ALERT_TEST_002" doc:name="Set Alert ID"/>
+            <set-variable variableName="facilityId" value="FAC_TEST_002" doc:name="Set Facility ID"/>
+            <set-variable variableName="riskScore" value="7" doc:name="Set Risk Score"/>
+            <set-variable variableName="affectedPopulation" value="50000" doc:name="Set Affected Population"/>
+            <set-variable variableName="location" value="Decatur Processing Plant" doc:name="Set Location"/>
+            <set-variable variableName="alertData" value="#[{emergencyType: 'AIR_QUALITY_EXCEEDANCE', description: 'AQI exceeded 150'}]" doc:name="Set Alert Data"/>
+            <set-variable variableName="slotifyBriefing" value="EMERGENCY: Air quality alert triggered. Coordination recommended." doc:name="Set Briefing"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <flow-ref name="slotify-create-emergency-meeting" doc:name="Call Create Emergency Meeting Flow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]" doc:name="Assert Success Status"/>
+            <munit-tools:assert-that expression="#[payload.meetingId]" is="#[MunitTools::notNullValue()]" doc:name="Assert Meeting ID Exists"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ==================== INCIDENT MEETING TESTS ==================== -->
+
+    <munit:test name="test-schedule-incident-meeting-critical" doc:name="Test Schedule Incident Meeting for Critical Severity">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {
+                        meetingId: 'MTG_INC_001',
+                        meetingUrl: 'https://slotify.io/meeting/incident-001',
+                        videoConference: { joinUrl: 'https://slotify.io/video/incident-001' },
+                        startTime: '2025-11-24T14:45:00Z',
+                        room: 'Incident Command Center',
+                        status: 'SCHEDULED'
+                    }]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+
+            <set-variable variableName="incidentId" value="INC_TEST_001" doc:name="Set Incident ID"/>
+            <set-variable variableName="facilityId" value="FAC_TEST_003" doc:name="Set Facility ID"/>
+            <set-variable variableName="incidentType" value="CONTAMINATION_BREACH" doc:name="Set Incident Type"/>
+            <set-variable variableName="severity" value="CRITICAL" doc:name="Set Severity"/>
+            <set-variable variableName="description" value="Chemical contamination detected in processing unit" doc:name="Set Description"/>
+            <set-variable variableName="reportedBy" value="Facility Operator" doc:name="Set Reported By"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <flow-ref name="slotify-schedule-incident-meeting" doc:name="Call Schedule Incident Meeting Flow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]" doc:name="Assert Success Status"/>
+            <munit-tools:assert-that expression="#[payload.meetingId]" is="#[MunitTools::notNullValue()]" doc:name="Assert Meeting ID Exists"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ==================== DISPATCH COORDINATION TESTS ==================== -->
+
+    <munit:test name="test-schedule-dispatch-coordination-urgent" doc:name="Test Schedule Dispatch Coordination for Urgent Priority">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {
+                        meetingId: 'MTG_DISPATCH_001',
+                        meetingUrl: 'https://slotify.io/meeting/dispatch-001',
+                        status: 'SCHEDULED'
+                    }]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+
+            <set-variable variableName="dispatchId" value="DSP_TEST_001" doc:name="Set Dispatch ID"/>
+            <set-variable variableName="vehicleId" value="TRUCK_001" doc:name="Set Vehicle ID"/>
+            <set-variable variableName="taskType" value="EMERGENCY_RESPONSE" doc:name="Set Task Type"/>
+            <set-variable variableName="priority" value="URGENT" doc:name="Set Priority"/>
+            <set-variable variableName="destination" value="#[{lat: 33.7490, lon: -84.3880}]" doc:name="Set Destination"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <flow-ref name="slotify-schedule-dispatch-coordination" doc:name="Call Schedule Dispatch Coordination Flow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]" doc:name="Assert Success Status"/>
+            <munit-tools:assert-that expression="#[payload.meetingId]" is="#[MunitTools::notNullValue()]" doc:name="Assert Meeting ID Exists"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ==================== ERROR HANDLING TESTS ==================== -->
+
+    <munit:test name="test-slotify-connection-error-handling" doc:name="Test Slotify Connection Error Handling">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-throw exception="#[new java.net.ConnectException('Connection refused')]"/>
+            </munit-tools:mock-when>
+
+            <set-variable variableName="alertLevel" value="CRITICAL" doc:name="Set Alert Level"/>
+            <set-variable variableName="alertId" value="ENV_ALERT_ERR_001" doc:name="Set Alert ID"/>
+            <set-variable variableName="facilityId" value="FAC_ERR_001" doc:name="Set Facility ID"/>
+            <set-variable variableName="riskScore" value="8" doc:name="Set Risk Score"/>
+            <set-variable variableName="affectedPopulation" value="100000" doc:name="Set Affected Population"/>
+            <set-variable variableName="location" value="Test Facility" doc:name="Set Location"/>
+            <set-variable variableName="alertData" value="#[{emergencyType: 'TEST_ERROR', description: 'Testing error handling'}]" doc:name="Set Alert Data"/>
+            <set-variable variableName="slotifyBriefing" value="Test briefing" doc:name="Set Briefing"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <flow-ref name="slotify-create-emergency-meeting" doc:name="Call Create Emergency Meeting Flow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('ERROR')]" doc:name="Assert Error Status"/>
+            <munit-tools:assert-that expression="#[payload.errorType]" is="#[MunitTools::equalTo('SLOTIFY_CONNECTION_ERROR')]" doc:name="Assert Error Type"/>
+            <munit-tools:assert-that expression="#[payload.fallback]" is="#[MunitTools::notNullValue()]" doc:name="Assert Fallback Message Exists"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-slotify-auth-error-handling" doc:name="Test Slotify Authentication Error Handling">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="config-ref" whereValue="Slotify_API_Request_Config"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-throw exception="#[new org.mule.extension.http.api.request.HttpRequestFailedException(
+                    'HTTP 401 Unauthorized',
+                    new org.mule.runtime.api.message.Message.builder().value('Unauthorized').build()
+                )]"/>
+            </munit-tools:mock-when>
+
+            <set-variable variableName="alertLevel" value="EMERGENCY" doc:name="Set Alert Level"/>
+            <set-variable variableName="alertId" value="ENV_ALERT_AUTH_001" doc:name="Set Alert ID"/>
+            <set-variable variableName="facilityId" value="FAC_AUTH_001" doc:name="Set Facility ID"/>
+            <set-variable variableName="riskScore" value="7" doc:name="Set Risk Score"/>
+            <set-variable variableName="affectedPopulation" value="75000" doc:name="Set Affected Population"/>
+            <set-variable variableName="location" value="Auth Test Facility" doc:name="Set Location"/>
+            <set-variable variableName="alertData" value="#[{emergencyType: 'TEST_AUTH', description: 'Testing auth error'}]" doc:name="Set Alert Data"/>
+            <set-variable variableName="slotifyBriefing" value="Auth test briefing" doc:name="Set Briefing"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <flow-ref name="slotify-create-emergency-meeting" doc:name="Call Create Emergency Meeting Flow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('ERROR')]" doc:name="Assert Error Status"/>
+            <munit-tools:assert-that expression="#[payload.errorType]" is="#[MunitTools::equalTo('SLOTIFY_AUTH_ERROR')]" doc:name="Assert Auth Error Type"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ==================== WEBHOOK HANDLER TESTS ==================== -->
+
+    <munit:test name="test-webhook-meeting-started" doc:name="Test Webhook Handler - Meeting Started">
+        <munit:behavior>
+            <set-payload value="#[output application/json --- {
+                event: 'meeting.started',
+                timestamp: now() as String {format: 'yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''},
+                data: {
+                    meetingId: 'MTG_WEBHOOK_001',
+                    participantCount: 5
+                }
+            }]" doc:name="Set Webhook Payload"/>
+            <set-variable variableName="webhookEvent" value="meeting.started" doc:name="Set Webhook Event"/>
+            <set-variable variableName="meetingId" value="MTG_WEBHOOK_001" doc:name="Set Meeting ID"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Process Meeting Started">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: vars.webhookEvent,
+    meetingId: vars.meetingId,
+    processedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('acknowledged')]" doc:name="Assert Acknowledged"/>
+            <munit-tools:assert-that expression="#[payload.event]" is="#[MunitTools::equalTo('meeting.started')]" doc:name="Assert Event Type"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-webhook-meeting-ended" doc:name="Test Webhook Handler - Meeting Ended">
+        <munit:behavior>
+            <set-payload value="#[output application/json --- {
+                event: 'meeting.ended',
+                timestamp: now() as String {format: 'yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''},
+                data: {
+                    meetingId: 'MTG_WEBHOOK_002',
+                    duration: 45,
+                    attendeeCount: 8,
+                    recordingUrl: 'https://slotify.io/recording/webhook-002'
+                }
+            }]" doc:name="Set Webhook Payload"/>
+            <set-variable variableName="webhookEvent" value="meeting.ended" doc:name="Set Webhook Event"/>
+            <set-variable variableName="meetingId" value="MTG_WEBHOOK_002" doc:name="Set Meeting ID"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Process Meeting Ended">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "acknowledged",
+    event: vars.webhookEvent,
+    meetingId: vars.meetingId,
+    duration: payload.data.duration,
+    attendeeCount: payload.data.attendeeCount,
+    recordingUrl: payload.data.recordingUrl,
+    processedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('acknowledged')]" doc:name="Assert Acknowledged"/>
+            <munit-tools:assert-that expression="#[payload.event]" is="#[MunitTools::equalTo('meeting.ended')]" doc:name="Assert Event Type"/>
+            <munit-tools:assert-that expression="#[payload.duration]" is="#[MunitTools::equalTo(45)]" doc:name="Assert Duration"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ==================== SCHEDULING CRITERIA TESTS ==================== -->
+
+    <munit:test name="test-scheduling-required-critical-alert" doc:name="Test Scheduling Required for Critical Alert">
+        <munit:behavior>
+            <set-variable variableName="alertLevel" value="CRITICAL" doc:name="Set Critical Alert Level"/>
+            <set-variable variableName="riskScore" value="9" doc:name="Set High Risk Score"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Evaluate Scheduling Criteria">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    schedulingRequired: vars.alertLevel == "CRITICAL" or vars.alertLevel == "EMERGENCY" or (vars.riskScore as Number default 0) >= 6,
+    alertLevel: vars.alertLevel,
+    riskScore: vars.riskScore
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.schedulingRequired]" is="#[MunitTools::equalTo(true)]" doc:name="Assert Scheduling Required"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-scheduling-not-required-low-risk" doc:name="Test Scheduling Not Required for Low Risk">
+        <munit:behavior>
+            <set-variable variableName="alertLevel" value="WARNING" doc:name="Set Warning Alert Level"/>
+            <set-variable variableName="riskScore" value="4" doc:name="Set Low Risk Score"/>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Evaluate Scheduling Criteria">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    schedulingRequired: vars.alertLevel == "CRITICAL" or vars.alertLevel == "EMERGENCY" or (vars.riskScore as Number default 0) >= 6,
+    alertLevel: vars.alertLevel,
+    riskScore: vars.riskScore
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.schedulingRequired]" is="#[MunitTools::equalTo(false)]" doc:name="Assert Scheduling Not Required"/>
+        </munit:validation>
+    </munit:test>
+
+</mule>

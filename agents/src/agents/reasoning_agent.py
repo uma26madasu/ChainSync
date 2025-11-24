@@ -471,3 +471,244 @@ ANALYSIS STEPS COMPLETED: {len(steps)}
 Full detailed analysis available in attached report.
 """
         return briefing.strip()
+
+    def generate_slotify_meeting_request(self, incident_data: Dict, analysis_result: Dict) -> Dict:
+        """
+        Generate a structured Slotify meeting request based on incident analysis.
+
+        Args:
+            incident_data: Original incident data
+            analysis_result: Result from analyze_incident method
+
+        Returns:
+            Dict containing Slotify meeting request parameters
+        """
+        recommendation = analysis_result.get('final_recommendation', {})
+        severity = self._determine_severity(incident_data, recommendation)
+
+        return {
+            "title": f"Emergency Response: {incident_data.get('incident_type', 'Environmental Incident')}",
+            "priority": self._map_severity_to_priority(severity),
+            "meetingType": self._get_meeting_type(severity),
+            "duration": self._estimate_meeting_duration(severity, incident_data),
+            "required_participants": self._identify_stakeholders(incident_data, severity),
+            "agenda": self._generate_meeting_agenda(incident_data, analysis_result),
+            "briefing": self._generate_slotify_briefing(
+                analysis_result.get('reasoning_steps', []),
+                recommendation
+            ),
+            "context": {
+                "incident_id": incident_data.get('incident_id'),
+                "facility_id": incident_data.get('facility_id'),
+                "incident_type": incident_data.get('incident_type'),
+                "severity": severity,
+                "confidence": recommendation.get('confidence', 0),
+                "recommended_action": recommendation.get('action'),
+                "fallback_plan": recommendation.get('fallback_plan')
+            },
+            "notifications": {
+                "email": True,
+                "sms": severity in ['CRITICAL', 'EMERGENCY'],
+                "push": True,
+                "reminder_minutes": 5 if severity == 'CRITICAL' else 15
+            }
+        }
+
+    def _determine_severity(self, incident_data: Dict, recommendation: Dict) -> str:
+        """Determine incident severity based on data and recommendation"""
+        urgency = recommendation.get('urgency', 'MEDIUM')
+        confidence = recommendation.get('confidence', 0.5)
+
+        # Check for critical indicators
+        incident_type = incident_data.get('incident_type', '').upper()
+        if 'CONTAMINATION' in incident_type or urgency == 'CRITICAL':
+            return 'CRITICAL'
+        elif urgency == 'HIGH' or confidence < 0.5:
+            return 'EMERGENCY'
+        elif urgency == 'MEDIUM':
+            return 'HIGH'
+        else:
+            return 'STANDARD'
+
+    def _map_severity_to_priority(self, severity: str) -> str:
+        """Map severity level to Slotify priority code"""
+        priority_map = {
+            'CRITICAL': 'P1',
+            'EMERGENCY': 'P2',
+            'HIGH': 'P3',
+            'STANDARD': 'P4'
+        }
+        return priority_map.get(severity, 'P3')
+
+    def _get_meeting_type(self, severity: str) -> str:
+        """Get meeting type based on severity"""
+        if severity == 'CRITICAL':
+            return 'EMERGENCY_RESPONSE'
+        elif severity == 'EMERGENCY':
+            return 'URGENT_COORDINATION'
+        else:
+            return 'STANDARD_REVIEW'
+
+    def _estimate_meeting_duration(self, severity: str, incident_data: Dict) -> int:
+        """Estimate required meeting duration in minutes"""
+        base_duration = {
+            'CRITICAL': 60,
+            'EMERGENCY': 45,
+            'HIGH': 30,
+            'STANDARD': 30
+        }.get(severity, 30)
+
+        # Add time for complex incidents
+        incident_type = incident_data.get('incident_type', '').upper()
+        if 'CONTAMINATION' in incident_type:
+            base_duration += 15
+        if incident_data.get('affected_population', 0) > 100000:
+            base_duration += 15
+
+        return min(base_duration, 120)  # Cap at 2 hours
+
+    def _identify_stakeholders(self, incident_data: Dict, severity: str) -> List[Dict]:
+        """Identify required stakeholders based on incident type and severity"""
+        stakeholders = []
+        incident_type = incident_data.get('incident_type', '').upper()
+
+        # Always include facility management
+        stakeholders.append({
+            "name": "Facility Operations",
+            "role": "REQUIRED",
+            "email": "ops@chainsync.com"
+        })
+
+        if severity in ['CRITICAL', 'EMERGENCY']:
+            stakeholders.extend([
+                {"name": "Emergency Response Team", "role": "LEAD", "email": "ert@chainsync.com"},
+                {"name": "Environmental Compliance Officer", "role": "REQUIRED", "email": "compliance@chainsync.com"}
+            ])
+
+        if severity == 'CRITICAL':
+            stakeholders.extend([
+                {"name": "EPA Regional Office", "role": "REQUIRED", "email": "epa-regional@agency.gov"},
+                {"name": "State Environmental Agency", "role": "REQUIRED", "email": "state-env@state.gov"},
+                {"name": "Public Health Department", "role": "REQUIRED", "email": "public-health@health.gov"}
+            ])
+
+        if 'CONTAMINATION' in incident_type:
+            stakeholders.append({
+                "name": "HazMat Response Team",
+                "role": "REQUIRED",
+                "email": "hazmat@response.com"
+            })
+
+        if 'WATER' in incident_type:
+            stakeholders.append({
+                "name": "Water Quality Specialist",
+                "role": "REQUIRED",
+                "email": "water-quality@chainsync.com"
+            })
+
+        return stakeholders
+
+    def _generate_meeting_agenda(self, incident_data: Dict, analysis_result: Dict) -> List[str]:
+        """Generate meeting agenda items based on incident analysis"""
+        agenda = [
+            "1. Incident Overview and Current Status",
+            "2. AI Analysis Summary and Recommendations"
+        ]
+
+        recommendation = analysis_result.get('final_recommendation', {})
+        action = recommendation.get('action', '')
+
+        if action:
+            agenda.append(f"3. Recommended Action: {action}")
+
+        agenda.extend([
+            "4. Resource Requirements and Allocation",
+            "5. Communication Strategy",
+            "6. Regulatory Notification Status",
+            "7. Action Items and Responsibilities",
+            "8. Follow-up Meeting Schedule"
+        ])
+
+        # Add specific agenda items based on incident type
+        incident_type = incident_data.get('incident_type', '').upper()
+        if 'CONTAMINATION' in incident_type:
+            agenda.insert(4, "4a. Containment and Decontamination Plan")
+        if recommendation.get('fallback_plan'):
+            agenda.insert(-1, f"7a. Fallback Plan: {recommendation['fallback_plan'][:50]}...")
+
+        return agenda
+
+    def generate_structured_briefing(self, incident_data: Dict, analysis_result: Dict) -> Dict:
+        """
+        Generate a comprehensive structured briefing for Slotify integration.
+
+        Returns a dict with all components needed for the meeting.
+        """
+        recommendation = analysis_result.get('final_recommendation', {})
+        steps = analysis_result.get('reasoning_steps', [])
+
+        return {
+            "executive_summary": self._generate_executive_summary(incident_data, recommendation),
+            "full_briefing": self._generate_slotify_briefing(steps, recommendation),
+            "meeting_request": self.generate_slotify_meeting_request(incident_data, analysis_result),
+            "key_findings": self._extract_key_findings(steps),
+            "action_items": self._generate_action_items(recommendation),
+            "risk_assessment": {
+                "level": recommendation.get('urgency', 'MEDIUM'),
+                "confidence": recommendation.get('confidence', 0),
+                "requires_immediate_action": recommendation.get('urgency') in ['CRITICAL', 'HIGH']
+            }
+        }
+
+    def _generate_executive_summary(self, incident_data: Dict, recommendation: Dict) -> str:
+        """Generate a brief executive summary for quick review"""
+        incident_type = incident_data.get('incident_type', 'Unknown Incident')
+        facility = incident_data.get('facility_id', 'Unknown Facility')
+        action = recommendation.get('action', 'Review Required')
+        confidence = int(recommendation.get('confidence', 0) * 100)
+
+        return (
+            f"INCIDENT: {incident_type} at {facility}. "
+            f"RECOMMENDED ACTION: {action} (Confidence: {confidence}%). "
+            f"URGENCY: {recommendation.get('urgency', 'MEDIUM')}."
+        )
+
+    def _extract_key_findings(self, steps: List[Dict]) -> List[str]:
+        """Extract key findings from analysis steps"""
+        findings = []
+        for step in steps:
+            finding = step.get('finding', '')
+            if finding and len(finding) > 10:
+                findings.append(finding[:200])
+        return findings[:5]  # Limit to top 5 findings
+
+    def _generate_action_items(self, recommendation: Dict) -> List[Dict]:
+        """Generate action items from recommendation"""
+        action_items = []
+
+        main_action = recommendation.get('action')
+        if main_action:
+            action_items.append({
+                "action": main_action,
+                "priority": "HIGH",
+                "owner": "Incident Commander",
+                "status": "PENDING"
+            })
+
+        fallback = recommendation.get('fallback_plan')
+        if fallback:
+            action_items.append({
+                "action": f"Fallback: {fallback}",
+                "priority": "MEDIUM",
+                "owner": "Backup Team",
+                "status": "STANDBY"
+            })
+
+        # Standard action items
+        action_items.extend([
+            {"action": "Document incident timeline", "priority": "MEDIUM", "owner": "Compliance", "status": "PENDING"},
+            {"action": "Prepare regulatory notification", "priority": "HIGH", "owner": "Compliance", "status": "PENDING"},
+            {"action": "Schedule follow-up assessment", "priority": "LOW", "owner": "Operations", "status": "PENDING"}
+        ])
+
+        return action_items
