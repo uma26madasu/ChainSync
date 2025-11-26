@@ -10,16 +10,26 @@
     <!-- Global Error Handler -->
     <error-handler name="global-error-handler">
         <on-error-propagate type="APIKIT:BAD_REQUEST">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] APIKIT:BAD_REQUEST - $(error.description)"]'/>
+
             <ee:transform doc:name="Transform Message - Bad Request">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Bad request",
-    error: error.description,
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    PLATFORM_BAD_REQUEST,
+    error.description,
+    {
+        requestPath: attributes.requestPath default null,
+        method: attributes.method default null
+    },
+    vars.correlationId default generateCorrelationId(),
+    400
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">400</ee:set-variable>
@@ -28,16 +38,26 @@ output application/json
         </on-error-propagate>
         
         <on-error-propagate type="APIKIT:NOT_FOUND">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] APIKIT:NOT_FOUND - Resource: $(attributes.requestPath default 'unknown')"]'/>
+
             <ee:transform doc:name="Transform Message - Not Found">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Resource not found",
-    path: attributes.requestPath,
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    PLATFORM_NOT_FOUND,
+    "The requested resource was not found",
+    {
+        path: attributes.requestPath default "unknown",
+        method: attributes.method default null
+    },
+    vars.correlationId default generateCorrelationId(),
+    404
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">404</ee:set-variable>
@@ -46,87 +66,133 @@ output application/json
         </on-error-propagate>
         
         <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] APIKIT:METHOD_NOT_ALLOWED - Method: $(attributes.method default 'unknown')"]'/>
+
             <ee:transform doc:name="Transform Message - Method Not Allowed">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Method not allowed",
-    method: attributes.method,
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    PLATFORM_METHOD_NOT_ALLOWED,
+    "The HTTP method is not allowed for this resource",
+    {
+        method: attributes.method default "unknown",
+        path: attributes.requestPath default null
+    },
+    vars.correlationId default generateCorrelationId(),
+    405
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">405</ee:set-variable>
                 </ee:variables>
             </ee:transform>
         </on-error-propagate>
-        
+
         <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] APIKIT:NOT_ACCEPTABLE"]'/>
+
             <ee:transform doc:name="Transform Message - Not Acceptable">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Not acceptable",
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    "PLATFORM_NOT_ACCEPTABLE",
+    "The requested content type is not supported",
+    {
+        acceptHeader: attributes.headers.accept default null
+    },
+    vars.correlationId default generateCorrelationId(),
+    406
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">406</ee:set-variable>
                 </ee:variables>
             </ee:transform>
         </on-error-propagate>
-        
+
         <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] APIKIT:UNSUPPORTED_MEDIA_TYPE - ContentType: $(attributes.headers.'content-type' default 'unknown')"]'/>
+
             <ee:transform doc:name="Transform Message - Unsupported Media Type">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Unsupported media type",
-    contentType: attributes.headers.'content-type',
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    "PLATFORM_UNSUPPORTED_MEDIA_TYPE",
+    "The content type is not supported",
+    {
+        contentType: attributes.headers.'content-type' default "unknown"
+    },
+    vars.correlationId default generateCorrelationId(),
+    415
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">415</ee:set-variable>
                 </ee:variables>
             </ee:transform>
         </on-error-propagate>
-        
+
         <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] APIKIT:NOT_IMPLEMENTED"]'/>
+
             <ee:transform doc:name="Transform Message - Not Implemented">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Not Implemented",
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    "PLATFORM_NOT_IMPLEMENTED",
+    "This feature has not been implemented yet",
+    null,
+    vars.correlationId default generateCorrelationId(),
+    501
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">501</ee:set-variable>
                 </ee:variables>
             </ee:transform>
         </on-error-propagate>
-        
+
         <!-- Generic error handler for any other errors -->
         <on-error-propagate type="ANY">
+            <logger level="ERROR"
+                    message='#["[$(vars.correlationId default '')] Unhandled Error: $(error.errorType.identifier default 'UNKNOWN') - $(error.description)"]'/>
+
             <ee:transform doc:name="Transform Message - Internal Server Error">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Internal server error",
-    errorType: error.errorType.identifier default "UNKNOWN",
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    PLATFORM_INTERNAL_ERROR,
+    "An unexpected error occurred",
+    {
+        errorType: error.errorType.identifier default "UNKNOWN"
+    },
+    vars.correlationId default generateCorrelationId(),
+    500
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">500</ee:set-variable>
@@ -138,15 +204,25 @@ output application/json
     <!-- Console Error Handler -->
     <error-handler name="console-error-handler">
         <on-error-propagate type="APIKIT:NOT_FOUND">
+            <logger level="WARN"
+                    message='#["[$(vars.correlationId default '')] Console resource not found: $(attributes.requestPath default 'unknown')"]'/>
+
             <ee:transform doc:name="Transform Message - Console Not Found">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+import * from error-handling-utils
+import * from error-codes
 ---
-{
-    message: "Console resource not found",
-    timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
-}]]></ee:set-payload>
+buildErrorResponse(
+    "CONSOLE_RESOURCE_NOT_FOUND",
+    "Console resource not found",
+    {
+        path: attributes.requestPath default "unknown"
+    },
+    vars.correlationId default generateCorrelationId(),
+    404
+)]]></ee:set-payload>
                 </ee:message>
                 <ee:variables>
                     <ee:set-variable variableName="httpStatus">404</ee:set-variable>

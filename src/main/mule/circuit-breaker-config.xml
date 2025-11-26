@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:os="http://www.mulesoft.org/schema/mule/os"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!--
+        Circuit Breaker Configuration
+
+        Provides circuit breaker pattern implementation for external API resilience
+        Tracks failure rates and automatically opens/closes circuits to prevent cascading failures
+    -->
+
+    <!-- ============================================ -->
+    <!-- OBJECT STORE CONFIGURATION -->
+    <!-- ============================================ -->
+
+    <!--
+        Circuit Breaker State Object Store
+        Stores circuit state across requests and instances
+    -->
+    <os:object-store name="circuit-breaker-state-store"
+                     persistent="true"
+                     entryTtl="1"
+                     entryTtlUnit="HOURS"
+                     maxEntries="100"
+                     expirationInterval="5"
+                     expirationIntervalUnit="MINUTES"/>
+
+    <!--
+        Circuit Breaker Metrics Object Store
+        Stores failure counts and success rates
+    -->
+    <os:object-store name="circuit-breaker-metrics-store"
+                     persistent="true"
+                     entryTtl="10"
+                     entryTtlUnit="MINUTES"
+                     maxEntries="100"/>
+
+    <!-- ============================================ -->
+    <!-- CONFIGURATION PROPERTIES -->
+    <!-- ============================================ -->
+
+    <!--
+        Default Circuit Breaker Configuration
+        Can be overridden per API in config.properties
+    -->
+    <configuration-properties doc:name="Circuit Breaker Defaults">
+        <configuration-properties-provider>
+            <ee:inline-properties>
+                <ee:property key="circuit.breaker.failure.threshold" value="5"/>
+                <ee:property key="circuit.breaker.timeout.seconds" value="60"/>
+                <ee:property key="circuit.breaker.half.open.max.calls" value="3"/>
+                <ee:property key="circuit.breaker.success.threshold" value="2"/>
+            </ee:inline-properties>
+        </configuration-properties-provider>
+    </configuration-properties>
+
+    <!-- ============================================ -->
+    <!-- CIRCUIT BREAKER FLOWS -->
+    <!-- ============================================ -->
+
+    <!--
+        Get Circuit State
+        Retrieves current circuit breaker state for an API
+
+        Input variables:
+        - vars.apiName: Name of the API
+
+        Output variables:
+        - vars.circuitState: "CLOSED", "OPEN", or "HALF_OPEN"
+        - vars.failureCount: Number of consecutive failures
+        - vars.lastFailureTime: Timestamp of last failure
+    -->
+    <sub-flow name="get-circuit-state">
+        <ee:transform doc:name="Set Circuit Key">
+            <ee:variables>
+                <ee:set-variable variableName="circuitKey"><![CDATA[%dw 2.0
+output application/java
+---
+"circuit:$(vars.apiName):state"]]></ee:set-variable>
+                <ee:set-variable variableName="metricsKey"><![CDATA[%dw 2.0
+output application/java
+---
+"circuit:$(vars.apiName):metrics"]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <try>
+            <os:retrieve doc:name="Retrieve Circuit State"
+                        objectStore="circuit-breaker-state-store"
+                        key="#[vars.circuitKey]"
+                        target="circuitStateData"/>
+
+            <os:retrieve doc:name="Retrieve Circuit Metrics"
+                        objectStore="circuit-breaker-metrics-store"
+                        key="#[vars.metricsKey]"
+                        target="circuitMetrics"/>
+
+            <ee:transform doc:name="Parse Circuit Data">
+                <ee:variables>
+                    <ee:set-variable variableName="circuitState"><![CDATA[%dw 2.0
+output application/java
+---
+vars.circuitStateData.state default "CLOSED"]]></ee:set-variable>
+                    <ee:set-variable variableName="failureCount"><![CDATA[%dw 2.0
+output application/java
+---
+vars.circuitMetrics.failureCount default 0]]></ee:set-variable>
+                    <ee:set-variable variableName="lastFailureTime"><![CDATA[%dw 2.0
+output application/java
+---
+vars.circuitMetrics.lastFailureTime default null]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+
+            <error-handler>
+                <on-error-continue type="OS:KEY_NOT_FOUND">
+                    <!-- Circuit not initialized, set defaults -->
+                    <logger level="DEBUG"
+                            message='#["Circuit breaker for $(vars.apiName) not found, initializing as CLOSED"]'/>
+
+                    <ee:transform doc:name="Set Default State">
+                        <ee:variables>
+                            <ee:set-variable variableName="circuitState"><![CDATA["CLOSED"]]></ee:set-variable>
+                            <ee:set-variable variableName="failureCount"><![CDATA[0]]></ee:set-variable>
+                            <ee:set-variable variableName="lastFailureTime"><![CDATA[null]]></ee:set-variable>
+                        </ee:variables>
+                    </ee:transform>
+                </on-error-continue>
+            </error-handler>
+        </try>
+
+        <!-- Check if circuit should transition from OPEN to HALF_OPEN -->
+        <choice doc:name="Should Transition to Half-Open?">
+            <when expression='#[vars.circuitState == "OPEN" and vars.lastFailureTime != null]'>
+                <ee:transform doc:name="Check Timeout">
+                    <ee:variables>
+                        <ee:set-variable variableName="timeoutExpired"><![CDATA[%dw 2.0
+output application/java
+import * from dw::core::Periods
+---
+do {
+    var lastFailure = vars.lastFailureTime as DateTime
+    var timeoutSeconds = p("${circuit.breaker.timeout.seconds}") as Number
+    var elapsedSeconds = (now() - lastFailure).seconds
+    ---
+    elapsedSeconds >= timeoutSeconds
+}]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+
+                <choice doc:name="Timeout Expired?">
+                    <when expression="#[vars.timeoutExpired == true]">
+                        <logger level="INFO"
+                                message='#["Circuit breaker for $(vars.apiName) transitioning from OPEN to HALF_OPEN"]'/>
+
+                        <flow-ref name="update-circuit-state-subflow"
+                                  doc:name="Transition to HALF_OPEN"/>
+
+                        <set-variable variableName="circuitState" value="HALF_OPEN"/>
+                    </when>
+                </choice>
+            </when>
+        </choice>
+    </sub-flow>
+
+    <!--
+        Record Circuit Failure
+        Records API failure and potentially opens circuit
+
+        Input variables:
+        - vars.apiName: Name of the API
+        - vars.correlationId: Request correlation ID
+    -->
+    <sub-flow name="record-circuit-failure">
+        <flow-ref name="get-circuit-state" doc:name="Get Current State"/>
+
+        <ee:transform doc:name="Increment Failure Count">
+            <ee:variables>
+                <ee:set-variable variableName="newFailureCount"><![CDATA[#[vars.failureCount + 1]]]></ee:set-variable>
+                <ee:set-variable variableName="failureThreshold"><![CDATA[#[p("${circuit.breaker.failure.threshold}") as Number]]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <logger level="WARN"
+                message='#["[$(vars.correlationId)] Circuit breaker for $(vars.apiName) - Failure $(vars.newFailureCount) of $(vars.failureThreshold)"]'/>
+
+        <!-- Store updated metrics -->
+        <ee:transform doc:name="Build Metrics Data">
+            <ee:variables>
+                <ee:set-variable variableName="metricsData"><![CDATA[%dw 2.0
+output application/json
+---
+{
+    failureCount: vars.newFailureCount,
+    lastFailureTime: now(),
+    apiName: vars.apiName
+}]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <os:store doc:name="Store Metrics"
+                 objectStore="circuit-breaker-metrics-store"
+                 key="#[vars.metricsKey]">
+            <os:value>#[vars.metricsData]</os:value>
+        </os:store>
+
+        <!-- Open circuit if threshold exceeded -->
+        <choice doc:name="Should Open Circuit?">
+            <when expression="#[vars.newFailureCount >= vars.failureThreshold]">
+                <logger level="ERROR"
+                        message='#["[$(vars.correlationId)] Circuit breaker OPENING for $(vars.apiName) - Threshold exceeded"]'/>
+
+                <ee:transform doc:name="Build Circuit State">
+                    <ee:variables>
+                        <ee:set-variable variableName="stateData"><![CDATA[%dw 2.0
+output application/json
+---
+{
+    state: "OPEN",
+    openedAt: now(),
+    apiName: vars.apiName,
+    reason: "Failure threshold exceeded"
+}]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+
+                <os:store doc:name="Store OPEN State"
+                         objectStore="circuit-breaker-state-store"
+                         key="#[vars.circuitKey]">
+                    <os:value>#[vars.stateData]</os:value>
+                </os:store>
+
+                <set-variable variableName="circuitState" value="OPEN"/>
+            </when>
+        </choice>
+    </sub-flow>
+
+    <!--
+        Record Circuit Success
+        Records successful API call and potentially closes circuit
+
+        Input variables:
+        - vars.apiName: Name of the API
+        - vars.correlationId: Request correlation ID
+    -->
+    <sub-flow name="record-circuit-success">
+        <flow-ref name="get-circuit-state" doc:name="Get Current State"/>
+
+        <logger level="INFO"
+                message='#["[$(vars.correlationId)] Circuit breaker for $(vars.apiName) - Success recorded"]'/>
+
+        <choice doc:name="Handle Success Based on State">
+            <!-- If HALF_OPEN, increment success count -->
+            <when expression='#[vars.circuitState == "HALF_OPEN"]'>
+                <ee:transform doc:name="Get Success Count">
+                    <ee:variables>
+                        <ee:set-variable variableName="successCount"><![CDATA[%dw 2.0
+output application/java
+---
+vars.circuitMetrics.successCount default 0 + 1]]></ee:set-variable>
+                        <ee:set-variable variableName="successThreshold"><![CDATA[%dw 2.0
+output application/java
+---
+p("${circuit.breaker.success.threshold}") as Number]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+
+                <choice doc:name="Should Close Circuit?">
+                    <when expression="#[vars.successCount >= vars.successThreshold]">
+                        <logger level="INFO"
+                                message='#["[$(vars.correlationId)] Circuit breaker CLOSING for $(vars.apiName) - Success threshold met"]'/>
+
+                        <!-- Close circuit and reset counters -->
+                        <flow-ref name="reset-circuit-subflow" doc:name="Reset Circuit"/>
+                    </when>
+                    <otherwise>
+                        <!-- Update success count -->
+                        <ee:transform doc:name="Update Success Count">
+                            <ee:variables>
+                                <ee:set-variable variableName="metricsData"><![CDATA[%dw 2.0
+output application/json
+---
+{
+    failureCount: 0,
+    successCount: vars.successCount,
+    lastSuccessTime: now(),
+    apiName: vars.apiName
+}]]></ee:set-variable>
+                            </ee:variables>
+                        </ee:transform>
+
+                        <os:store doc:name="Store Success Count"
+                                 objectStore="circuit-breaker-metrics-store"
+                                 key="#[vars.metricsKey]">
+                            <os:value>#[vars.metricsData]</os:value>
+                        </os:store>
+                    </otherwise>
+                </choice>
+            </when>
+
+            <!-- If CLOSED and had failures, reset failure count -->
+            <when expression='#[vars.circuitState == "CLOSED" and vars.failureCount > 0]'>
+                <flow-ref name="reset-circuit-subflow" doc:name="Reset Failure Count"/>
+            </when>
+        </choice>
+    </sub-flow>
+
+    <!--
+        Reset Circuit
+        Resets circuit to CLOSED state and clears metrics
+    -->
+    <sub-flow name="reset-circuit-subflow">
+        <ee:transform doc:name="Build Reset Data">
+            <ee:variables>
+                <ee:set-variable variableName="stateData"><![CDATA[%dw 2.0
+output application/json
+---
+{
+    state: "CLOSED",
+    resetAt: now(),
+    apiName: vars.apiName
+}]]></ee:set-variable>
+                <ee:set-variable variableName="metricsData"><![CDATA[%dw 2.0
+output application/json
+---
+{
+    failureCount: 0,
+    successCount: 0,
+    apiName: vars.apiName
+}]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <os:store doc:name="Store CLOSED State"
+                 objectStore="circuit-breaker-state-store"
+                 key="#[vars.circuitKey]">
+            <os:value>#[vars.stateData]</os:value>
+        </os:store>
+
+        <os:store doc:name="Reset Metrics"
+                 objectStore="circuit-breaker-metrics-store"
+                 key="#[vars.metricsKey]">
+            <os:value>#[vars.metricsData]</os:value>
+        </os:store>
+
+        <set-variable variableName="circuitState" value="CLOSED"/>
+    </sub-flow>
+
+    <!--
+        Update Circuit State
+        Updates circuit state without changing metrics
+    -->
+    <sub-flow name="update-circuit-state-subflow">
+        <ee:transform doc:name="Build State Data">
+            <ee:variables>
+                <ee:set-variable variableName="stateData"><![CDATA[%dw 2.0
+output application/json
+---
+{
+    state: vars.circuitState,
+    updatedAt: now(),
+    apiName: vars.apiName
+}]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <os:store doc:name="Store State"
+                 objectStore="circuit-breaker-state-store"
+                 key="#[vars.circuitKey]">
+            <os:value>#[vars.stateData]</os:value>
+        </os:store>
+    </sub-flow>
+
+</mule>

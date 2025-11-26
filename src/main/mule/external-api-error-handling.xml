@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!--
+        External API Error Handling Module
+
+        Provides reusable error handling flows for external API integrations
+        including retry logic, circuit breaker pattern, and fallback strategies
+    -->
+
+    <!-- ============================================ -->
+    <!-- REUSABLE ERROR HANDLING FLOWS -->
+    <!-- ============================================ -->
+
+    <!--
+        Generic External API Error Handler
+        Use this as a sub-flow for any external API call
+
+        Expected variables:
+        - vars.correlationId: Request correlation ID
+        - vars.apiName: Name of external API (e.g., "WeatherAPI", "Slotify")
+        - vars.errorContext: Additional context for error logging
+        - vars.fallbackData: Data to return on failure (optional)
+    -->
+    <sub-flow name="external-api-error-handler">
+        <error-handler>
+            <!-- Connectivity and Timeout Errors - Retryable -->
+            <on-error-continue type="HTTP:CONNECTIVITY, HTTP:TIMEOUT">
+                <logger level="WARN"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) connectivity/timeout error: $(error.description)"]'/>
+
+                <ee:transform doc:name="Build Error Response with Fallback">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+if (vars.fallbackData != null)
+    buildFallbackResponse(
+        vars.apiName,
+        error.description,
+        vars.fallbackData,
+        vars.correlationId
+    )
+else
+    buildErrorResponse(
+        mapHttpStatusToErrorCode(503, vars.apiName),
+        getErrorMessage(vars.apiName ++ "_UNAVAILABLE"),
+        {
+            apiName: vars.apiName,
+            errorType: error.errorType.identifier
+        },
+        vars.correlationId,
+        503
+    )
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[503]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+
+            <!-- Rate Limit Errors - Retryable with backoff -->
+            <on-error-continue type="HTTP:TOO_MANY_REQUESTS">
+                <logger level="WARN"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) rate limit exceeded"]'/>
+
+                <ee:transform doc:name="Build Rate Limit Error Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+buildErrorResponse(
+    vars.apiName ++ "_RATE_LIMIT",
+    "Rate limit exceeded for $(vars.apiName). Please try again later.",
+    {
+        apiName: vars.apiName,
+        retryAfter: payload.headers['Retry-After'] default "60 seconds"
+    },
+    vars.correlationId,
+    429
+)
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[429]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+
+            <!-- Authentication Errors - Not Retryable -->
+            <on-error-continue type="HTTP:UNAUTHORIZED, HTTP:FORBIDDEN">
+                <logger level="ERROR"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) authentication failed: $(error.description)"]'/>
+
+                <ee:transform doc:name="Build Auth Error Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+buildErrorResponse(
+    vars.apiName ++ "_" ++ (if (error.errorType.identifier contains "UNAUTHORIZED") "UNAUTHORIZED" else "FORBIDDEN"),
+    "Authentication failed for $(vars.apiName). Please check API credentials.",
+    {
+        apiName: vars.apiName,
+        errorType: error.errorType.identifier,
+        configurationHelp: "Verify API key configuration in properties file"
+    },
+    vars.correlationId,
+    if (error.errorType.identifier contains "UNAUTHORIZED") 401 else 403
+)
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[#[if (error.errorType.identifier contains "UNAUTHORIZED") 401 else 403]]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+
+            <!-- Bad Request Errors - Not Retryable -->
+            <on-error-continue type="HTTP:BAD_REQUEST">
+                <logger level="ERROR"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) bad request: $(error.description)"]'/>
+
+                <ee:transform doc:name="Build Bad Request Error Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+buildErrorResponse(
+    vars.apiName ++ "_BAD_REQUEST",
+    "Invalid request to $(vars.apiName)",
+    {
+        apiName: vars.apiName,
+        errorType: error.errorType.identifier,
+        (requestDetails: vars.errorContext) if (vars.errorContext != null)
+    },
+    vars.correlationId,
+    400
+)
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+
+            <!-- Not Found Errors -->
+            <on-error-continue type="HTTP:NOT_FOUND">
+                <logger level="WARN"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) resource not found: $(error.description)"]'/>
+
+                <ee:transform doc:name="Build Not Found Error Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+buildErrorResponse(
+    vars.apiName ++ "_NOT_FOUND",
+    "Requested resource not found in $(vars.apiName)",
+    {
+        apiName: vars.apiName,
+        (requestDetails: vars.errorContext) if (vars.errorContext != null)
+    },
+    vars.correlationId,
+    404
+)
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+
+            <!-- Server Errors - Retryable -->
+            <on-error-continue type="HTTP:INTERNAL_SERVER_ERROR, HTTP:SERVICE_UNAVAILABLE, HTTP:BAD_GATEWAY">
+                <logger level="ERROR"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) server error: $(error.description)"]'/>
+
+                <ee:transform doc:name="Build Server Error Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+if (vars.fallbackData != null)
+    buildFallbackResponse(
+        vars.apiName,
+        error.description,
+        vars.fallbackData,
+        vars.correlationId
+    )
+else
+    buildErrorResponse(
+        vars.apiName ++ "_INTERNAL_ERROR",
+        "$(vars.apiName) is experiencing technical difficulties",
+        {
+            apiName: vars.apiName,
+            errorType: error.errorType.identifier
+        },
+        vars.correlationId,
+        500
+    )
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+
+            <!-- Generic Error Handler - Catch All -->
+            <on-error-continue type="ANY">
+                <logger level="ERROR"
+                        message='#["[$(vars.correlationId)] $(vars.apiName) unexpected error: $(error.description)"]'/>
+
+                <ee:transform doc:name="Build Generic Error Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+if (vars.fallbackData != null)
+    buildFallbackResponse(
+        vars.apiName,
+        error.description,
+        vars.fallbackData,
+        vars.correlationId
+    )
+else
+    buildErrorResponseFromException(
+        error,
+        vars.apiName ++ "_INTERNAL_ERROR",
+        vars.correlationId
+    )
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-continue>
+        </error-handler>
+    </sub-flow>
+
+    <!-- ============================================ -->
+    <!-- RETRY WRAPPER FLOW -->
+    <!-- ============================================ -->
+
+    <!--
+        Retry Wrapper for External API Calls
+        Implements exponential backoff for retryable errors
+
+        Expected variables:
+        - vars.maxRetries: Maximum retry attempts (default: 3)
+        - vars.baseDelayMs: Base delay in milliseconds (default: 1000)
+
+        Usage: Wrap your HTTP request in an until-successful with this flow
+    -->
+    <flow name="retry-wrapper-flow">
+        <!-- This flow is meant to be used with until-successful scope -->
+        <!-- Configure until-successful with maxRetries and millisBetweenRetries -->
+        <logger level="INFO" message='#["[$(vars.correlationId)] Attempting API call (Attempt: $(vars.retryAttempt default 1))"]'/>
+
+        <!-- The actual API call should be placed here when using this flow -->
+        <!-- This is a template flow - implement specific API calls in consumer flows -->
+
+        <error-handler>
+            <on-error-propagate type="HTTP:CONNECTIVITY, HTTP:TIMEOUT, HTTP:TOO_MANY_REQUESTS, HTTP:SERVICE_UNAVAILABLE">
+                <logger level="WARN"
+                        message='#["[$(vars.correlationId)] Retryable error occurred: $(error.description)"]'/>
+
+                <!-- Set retry flag for until-successful -->
+                <set-variable variableName="shouldRetry" value="#[true]"/>
+            </on-error-propagate>
+
+            <on-error-continue type="ANY">
+                <logger level="ERROR"
+                        message='#["[$(vars.correlationId)] Non-retryable error occurred: $(error.description)"]'/>
+
+                <!-- Set retry flag to false for non-retryable errors -->
+                <set-variable variableName="shouldRetry" value="#[false]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <!-- ============================================ -->
+    <!-- CIRCUIT BREAKER STATE MANAGEMENT -->
+    <!-- ============================================ -->
+
+    <!--
+        Circuit Breaker Check Flow
+        Checks if circuit is open before making external API call
+
+        Expected variables:
+        - vars.apiName: Name of the API to check
+        - vars.correlationId: Request correlation ID
+
+        Returns:
+        - vars.circuitOpen: true if circuit is open (should not call API)
+    -->
+    <sub-flow name="circuit-breaker-check">
+        <ee:transform doc:name="Check Circuit State">
+            <ee:message>
+            </ee:message>
+            <ee:variables>
+                <!-- Circuit breaker state stored in Object Store (to be implemented) -->
+                <!-- For now, default to closed (circuit not open) -->
+                <ee:set-variable variableName="circuitOpen"><![CDATA[false]]></ee:set-variable>
+                <ee:set-variable variableName="failureCount"><![CDATA[0]]></ee:set-variable>
+                <ee:set-variable variableName="circuitThreshold"><![CDATA[5]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <choice doc:name="Circuit Open?">
+            <when expression="#[vars.circuitOpen == true]">
+                <logger level="WARN"
+                        message='#["[$(vars.correlationId)] Circuit breaker OPEN for $(vars.apiName) - rejecting request"]'/>
+
+                <ee:transform doc:name="Build Circuit Open Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from error-handling-utils
+import * from error-codes
+---
+buildErrorResponse(
+    vars.apiName ++ "_UNAVAILABLE",
+    "$(vars.apiName) is temporarily unavailable due to repeated failures",
+    {
+        circuitBreakerStatus: "OPEN",
+        message: "Service is in recovery mode. Please try again later."
+    },
+    vars.correlationId,
+    503
+)
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[503]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </when>
+        </choice>
+    </sub-flow>
+
+    <!--
+        Circuit Breaker Record Failure
+        Records failure and potentially opens circuit
+    -->
+    <sub-flow name="circuit-breaker-record-failure">
+        <logger level="WARN"
+                message='#["[$(vars.correlationId)] Recording failure for $(vars.apiName) circuit breaker"]'/>
+
+        <!-- Circuit breaker failure recording logic -->
+        <!-- To be implemented with Object Store for distributed state management -->
+        <ee:transform doc:name="Update Failure Count">
+            <ee:variables>
+                <ee:set-variable variableName="failureCount"><![CDATA[#[vars.failureCount default 0 + 1]]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+    </sub-flow>
+
+    <!--
+        Circuit Breaker Record Success
+        Records success and potentially closes circuit
+    -->
+    <sub-flow name="circuit-breaker-record-success">
+        <logger level="INFO"
+                message='#["[$(vars.correlationId)] Recording success for $(vars.apiName) circuit breaker"]'/>
+
+        <!-- Reset failure count on success -->
+        <ee:transform doc:name="Reset Failure Count">
+            <ee:variables>
+                <ee:set-variable variableName="failureCount"><![CDATA[0]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+    </sub-flow>
+
+</mule>
