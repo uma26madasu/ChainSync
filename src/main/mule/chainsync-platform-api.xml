@@ -18,6 +18,9 @@
     <import file="external-api-config.xml" doc:name="Import External API Configurations"/>
     <import file="environmental-data-integration.xml" doc:name="Import Environmental Data Integration"/>
     <import file="error-handling.xml" doc:name="Import Error Handling"/>
+    <import file="external-api-error-handling.xml" doc:name="Import External API Error Handling"/>
+    <import file="circuit-breaker-config.xml" doc:name="Import Circuit Breaker Configuration"/>
+    <import file="orchestration-example.xml" doc:name="Import Orchestration Example (Reference Implementation)"/>
 
     <!-- Import ALL implementation files for complete API coverage -->
 
@@ -41,6 +44,10 @@
 
     <!-- AI Integration Implementation -->
     <import file="ai-agent-integration-impl.xml" doc:name="Import AI Agent Integration Implementation"/>
+
+    <!-- Slotify Integration (Meeting Scheduling) -->
+    <import file="slotify-config.xml" doc:name="Import Slotify Configuration"/>
+    <import file="slotify-integration-impl.xml" doc:name="Import Slotify Integration Implementation"/>
 
     <!-- Fleet Coordination Implementations -->
     <import file="environmental-data-system-api.xml" doc:name="Import Fleet Coordination Recommendations"/>
