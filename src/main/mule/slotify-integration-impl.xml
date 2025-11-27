@@ -539,6 +539,11 @@ output application/json
 
     <!-- ==================== UTILITY SUB-FLOWS ==================== -->
 
+    <!-- Sub-flow: Create Emergency Coordination Meeting (Wrapper for orchestration) -->
+    <sub-flow name="create-emergency-coordination-meeting-subflow" doc:name="Create Emergency Coordination Meeting">
+        <flow-ref name="slotify-create-emergency-meeting" doc:name="Call Slotify Create Meeting"/>
+    </sub-flow>
+
     <!-- Sub-flow: Check if Slotify scheduling is required -->
     <sub-flow name="slotify-check-scheduling-required" doc:name="Check if Scheduling Required">
         <ee:transform doc:name="Evaluate Scheduling Criteria">

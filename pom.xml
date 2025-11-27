@@ -57,6 +57,13 @@
 			<version>1.2.4</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
+		<!-- Mule Object Store Connector -->
+		<dependency>
+			<groupId>org.mule.connectors</groupId>
+			<artifactId>mule-objectstore-connector</artifactId>
+			<version>1.2.1</version>
+			<classifier>mule-plugin</classifier>
+		</dependency>
 		<!-- APIkit Module -->
 		<dependency>
 			<groupId>org.mule.modules</groupId>
