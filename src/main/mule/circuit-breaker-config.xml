@@ -47,18 +47,12 @@
 
     <!--
         Default Circuit Breaker Configuration
-        Can be overridden per API in config.properties
+        Configuration is loaded from config.properties:
+        - circuit.breaker.failure.threshold (default: 5)
+        - circuit.breaker.timeout.seconds (default: 60)
+        - circuit.breaker.half.open.max.calls (default: 3)
+        - circuit.breaker.success.threshold (default: 2)
     -->
-    <configuration-properties doc:name="Circuit Breaker Defaults">
-        <configuration-properties-provider>
-            <ee:inline-properties>
-                <ee:property key="circuit.breaker.failure.threshold" value="5"/>
-                <ee:property key="circuit.breaker.timeout.seconds" value="60"/>
-                <ee:property key="circuit.breaker.half.open.max.calls" value="3"/>
-                <ee:property key="circuit.breaker.success.threshold" value="2"/>
-            </ee:inline-properties>
-        </configuration-properties-provider>
-    </configuration-properties>
 
     <!-- ============================================ -->
     <!-- CIRCUIT BREAKER FLOWS -->

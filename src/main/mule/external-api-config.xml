@@ -45,4 +45,23 @@
         </http:default-headers>
     </http:request-config>
 
+    <!-- Slotify API Configuration -->
+    <http:request-config name="Slotify_API_Request_Config" doc:name="Slotify HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="api.slotify.io" port="443">
+            <http:client-socket-properties>
+                <sockets:tcp-client-socket-properties connectionTimeout="${slotify.api.timeout}" clientTimeout="${slotify.api.timeout}"/>
+            </http:client-socket-properties>
+        </http:request-connection>
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json" />
+            <http:default-header key="Content-Type" value="application/json" />
+            <http:default-header key="Authorization" value="Bearer ${slotify.api.key}" />
+        </http:default-headers>
+    </http:request-config>
+
+    <!-- Slotify Webhook Listener Configuration -->
+    <http:listener-config name="Slotify_Webhook_Listener_Config" doc:name="Slotify Webhook Listener Config">
+        <http:listener-connection host="0.0.0.0" port="${http.port}"/>
+    </http:listener-config>
+
 </mule>
