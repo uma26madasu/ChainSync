@@ -162,6 +162,37 @@ var alertStations = payload.data filter ($.riskAssessment.riskScore >= 5)
                 "Environmental information hotline"
             ] else []
         },
+        nasaIncidents: [
+            // Only store if wildfire detected
+            if ($.nasaAlerts.wildfire.wildfireDetected default false) {
+                incidentType: "WILDFIRE",
+                nasaAlertId: "FIRMS_" ++ ($.nasaAlerts.wildfire.nearestFire.timestamp default now() as String {format: "yyyyMMdd_HHmmss"}),
+                geoCoordinate: {
+                    lat: $.nasaAlerts.wildfire.nearestFire.lat,
+                    lon: $.nasaAlerts.wildfire.nearestFire.lon
+                },
+                timestamp: $.nasaAlerts.wildfire.nearestFire.timestamp,
+                confidence: $.nasaAlerts.wildfire.nearestFire.confidence,
+                source: "NASA_FIRMS"
+            } else {},
+            // Only store if flood detected
+            if ($.nasaAlerts.floodRisk.floodDetected default false) {
+                incidentType: "FLOOD",
+                nasaAlertId: "EONET_" ++ ($.nasaAlerts.floodRisk.nearestFlood.id default "UNKNOWN"),
+                geoCoordinate: {
+                    lat: $.nasaAlerts.floodRisk.nearestFlood.lat,
+                    lon: $.nasaAlerts.floodRisk.nearestFlood.lon
+                },
+                timestamp: $.nasaAlerts.floodRisk.nearestFlood.date,
+                title: $.nasaAlerts.floodRisk.nearestFlood.title,
+                source: "NASA_EONET"
+            } else {}
+        ] filter ($ != {}),
+        satelliteImageryUrl: if ($.riskAssessment.riskScore >= 8)
+            p('nasa.gibs.base.url') ++ "/" ++ p('nasa.gibs.layer') ++ "/default/"
+            ++ now() as String {format: "yyyy-MM-dd"}
+            ++ "/" ++ p('nasa.gibs.resolution') ++ "/8/3/33_-84.jpg"
+        else null,
         timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
     },
     summary: {

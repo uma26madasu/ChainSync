@@ -64,4 +64,40 @@
         <http:listener-connection host="0.0.0.0" port="${http.port}"/>
     </http:listener-config>
 
+    <!-- NASA FIRMS Wildfire API Configuration -->
+    <http:request-config name="NASA_FIRMS_Request_Config" doc:name="NASA FIRMS HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="firms.modaps.eosdis.nasa.gov" port="443">
+            <http:client-socket-properties>
+                <sockets:tcp-client-socket-properties connectionTimeout="5000" clientTimeout="5000"/>
+            </http:client-socket-properties>
+        </http:request-connection>
+        <http:default-headers>
+            <http:default-header key="Accept" value="text/csv" />
+        </http:default-headers>
+    </http:request-config>
+
+    <!-- NASA POWER API Configuration -->
+    <http:request-config name="NASA_POWER_Request_Config" doc:name="NASA POWER HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="power.larc.nasa.gov" port="443">
+            <http:client-socket-properties>
+                <sockets:tcp-client-socket-properties connectionTimeout="7000" clientTimeout="7000"/>
+            </http:client-socket-properties>
+        </http:request-connection>
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json" />
+        </http:default-headers>
+    </http:request-config>
+
+    <!-- NASA EONET Flood Events API Configuration -->
+    <http:request-config name="NASA_EONET_Request_Config" doc:name="NASA EONET HTTP Request Config">
+        <http:request-connection protocol="HTTPS" host="eonet.gsfc.nasa.gov" port="443">
+            <http:client-socket-properties>
+                <sockets:tcp-client-socket-properties connectionTimeout="5000" clientTimeout="5000"/>
+            </http:client-socket-properties>
+        </http:request-connection>
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json" />
+        </http:default-headers>
+    </http:request-config>
+
 </mule>
