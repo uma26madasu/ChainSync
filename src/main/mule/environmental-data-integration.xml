@@ -13,25 +13,42 @@
         <choice doc:name="API Integration Choice">
             <when expression="#[p('external.apis.enabled') == 'true']">
                 <try doc:name="Try Real APIs">
-                    <scatter-gather doc:name="Gather Real Data">
+                    <scatter-gather doc:name="Gather Real Data + NASA">
                         <route>
                             <flow-ref name="fetch-weather-data-subflow" doc:name="Get Weather Data"/>
                         </route>
                         <route>
                             <flow-ref name="fetch-air-quality-data-subflow" doc:name="Get Air Quality Data"/>
                         </route>
+                        <route>
+                            <flow-ref name="fetch-nasa-firms-alerts-subflow" doc:name="Get NASA FIRMS Wildfire Data"/>
+                        </route>
+                        <route>
+                            <flow-ref name="fetch-nasa-power-weather-subflow" doc:name="Get NASA POWER Weather Data"/>
+                        </route>
+                        <route>
+                            <flow-ref name="fetch-nasa-flood-metadata-subflow" doc:name="Get NASA Flood Metadata"/>
+                        </route>
                     </scatter-gather>
-                    <ee:transform doc:name="Merge Real API Data">
+                    <ee:transform doc:name="Merge Real API Data + NASA">
                         <ee:message>
                             <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 var weatherData = payload[0].payload
 var airData = payload[1].payload
+var firmsData = payload[2].payload
+var powerData = payload[3].payload
+var floodData = payload[4].payload
 ---
 {
   weather: weatherData,
   airQuality: airData,
-  dataSource: "Real-time APIs (Weather: OpenWeatherMap, Air: OpenAQ)",
+  nasaAlerts: {
+    wildfire: firmsData,
+    solarWeather: powerData,
+    floodRisk: floodData
+  },
+  dataSource: "Real-time APIs (Weather: OpenWeatherMap, Air: OpenAQ, NASA: FIRMS/POWER/EONET)",
   isRealTime: true,
   apiStatus: "CONNECTED"
 }]]></ee:set-payload>
@@ -239,6 +256,187 @@ output application/json
     co: 0
   },
   error: "Air quality service temporarily unavailable"
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <sub-flow name="fetch-nasa-firms-alerts-subflow" doc:name="Fetch NASA FIRMS Fire Alerts">
+        <try doc:name="Try FIRMS API">
+            <http:request method="GET"
+                          config-ref="NASA_FIRMS_Request_Config"
+                          path="/api/area/csv/${nasa.firms.api.key}/VIIRS_SNPP_NRT/{vars.latitude},{vars.longitude},${nasa.firms.radius.km}/1"
+                          doc:name="Call NASA FIRMS API">
+                <http:response-validator>
+                    <http:success-status-code-validator values="200"/>
+                </http:response-validator>
+            </http:request>
+
+            <ee:transform doc:name="Transform FIRMS CSV to Lightweight JSON">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var lines = payload splitBy "\n"
+var dataLines = lines[1 to -1] filter ($ != "")
+var hasFires = sizeOf(dataLines) > 0
+var firstFire = if (hasFires) dataLines[0] splitBy "," else []
+---
+{
+  wildfireDetected: hasFires,
+  activeFireCount: sizeOf(dataLines),
+  nearestFire: if (hasFires) {
+    lat: firstFire[0] as Number,
+    lon: firstFire[1] as Number,
+    confidence: firstFire[9],
+    timestamp: firstFire[5] ++ "T" ++ firstFire[6]
+  } else null,
+  source: "NASA_FIRMS_VIIRS"
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+            <error-handler>
+                <on-error-continue type="ANY">
+                    <logger level="WARN" message="NASA FIRMS API unavailable: #[error.description]" doc:name="Log FIRMS Failure"/>
+                    <ee:transform doc:name="FIRMS Unavailable">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  wildfireDetected: false,
+  activeFireCount: 0,
+  nearestFire: null,
+  source: "NASA_FIRMS_UNAVAILABLE"
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <sub-flow name="fetch-nasa-power-weather-subflow" doc:name="Fetch NASA POWER Weather">
+        <try doc:name="Try NASA POWER API">
+            <http:request method="GET"
+                          config-ref="NASA_POWER_Request_Config"
+                          path="/api/temporal/hourly/point"
+                          doc:name="Call NASA POWER API">
+                <http:query-params><![CDATA[#[{
+                    'parameters': p('nasa.power.parameters'),
+                    'latitude': vars.latitude,
+                    'longitude': vars.longitude,
+                    'start': now() as String {format: "yyyyMMdd"} ++ "00",
+                    'end': now() as String {format: "yyyyMMdd"} ++ "23",
+                    'community': 'RE',
+                    'format': 'JSON'
+                }]]]></http:query-params>
+                <http:response-validator>
+                    <http:success-status-code-validator values="200"/>
+                </http:response-validator>
+            </http:request>
+
+            <ee:transform doc:name="Extract Latest NASA POWER Data">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var params = payload.properties.parameter
+var latestHour = now() as String {format: "yyyyMMddHH"}
+---
+{
+  temperature: params.T2M[latestHour] default 0,
+  humidity: params.RH2M[latestHour] default 0,
+  windSpeed: params.WS10M[latestHour] default 0,
+  precipitation: params.PRECTOTCORR[latestHour] default 0,
+  solarIrradiance: params.ALLSKY_SFC_SW_DWN[latestHour] default 0,
+  source: "NASA_POWER",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"}
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+            <error-handler>
+                <on-error-continue type="ANY">
+                    <logger level="WARN" message="NASA POWER API unavailable: #[error.description]" doc:name="Log POWER Failure"/>
+                    <ee:transform doc:name="POWER Unavailable">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  temperature: 0,
+  humidity: 0,
+  windSpeed: 0,
+  precipitation: 0,
+  solarIrradiance: 0,
+  source: "NASA_POWER_UNAVAILABLE"
+}]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <sub-flow name="fetch-nasa-flood-metadata-subflow" doc:name="Fetch NASA Flood Metadata">
+        <try doc:name="Try NASA Flood API">
+            <http:request method="GET"
+                          config-ref="NASA_EONET_Request_Config"
+                          path="/api/v2/events"
+                          doc:name="Call NASA EONET Flood Events">
+                <http:query-params><![CDATA[#[{
+                    'category': 'floods',
+                    'status': 'open',
+                    'limit': 5,
+                    'bbox': (vars.longitude - p('nasa.eonet.flood.bbox.size') as Number) ++ ','
+                            ++ (vars.latitude - p('nasa.eonet.flood.bbox.size') as Number) ++ ','
+                            ++ (vars.longitude + p('nasa.eonet.flood.bbox.size') as Number) ++ ','
+                            ++ (vars.latitude + p('nasa.eonet.flood.bbox.size') as Number)
+                }]]]></http:query-params>
+                <http:response-validator>
+                    <http:success-status-code-validator values="200"/>
+                </http:response-validator>
+            </http:request>
+
+            <ee:transform doc:name="Extract Flood Metadata Only">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var events = payload.events default []
+var hasFlood = sizeOf(events) > 0
+var nearestFlood = if (hasFlood) events[0] else null
+---
+{
+  floodDetected: hasFlood,
+  activeFloodCount: sizeOf(events),
+  nearestFlood: if (hasFlood) {
+    id: nearestFlood.id,
+    title: nearestFlood.title,
+    lat: nearestFlood.geometry[0].coordinates[1],
+    lon: nearestFlood.geometry[0].coordinates[0],
+    date: nearestFlood.geometry[0].date
+  } else null,
+  source: "NASA_EONET_FLOODS"
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+            <error-handler>
+                <on-error-continue type="ANY">
+                    <logger level="WARN" message="NASA EONET Flood API unavailable: #[error.description]" doc:name="Log EONET Failure"/>
+                    <ee:transform doc:name="Flood API Unavailable">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  floodDetected: false,
+  activeFloodCount: 0,
+  nearestFlood: null,
+  source: "NASA_EONET_UNAVAILABLE"
 }]]></ee:set-payload>
                         </ee:message>
                     </ee:transform>
