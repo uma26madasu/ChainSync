@@ -30,6 +30,19 @@ ChainSync is an enterprise-grade environmental services emergency coordination p
 │  Compliance Tracking  │                              │  Emergency Fleet     │
 └──────────────────────┘                              └─────────────────────┘
 
+## 🛰️ NASA Satellite Intelligence Integration
+
+ChainSync leverages NASA's environmental monitoring systems for enhanced situational awareness:
+
+- **FIRMS (Fire Information)**: Real-time wildfire detection within 50km of facilities
+- **POWER (Solar/Weather)**: Long-term meteorological trends for predictive analytics
+- **EONET (Natural Events)**: Flood risk monitoring for water treatment facilities
+- **GIBS (Satellite Imagery)**: Visual context for critical emergency briefings
+
+This hybrid architecture combines commercial real-time weather APIs with NASA satellite data—the same systems used by NOAA and FEMA—for multi-hazard environmental intelligence.
+
+**Key Differentiator:** While competitors rely solely on commercial weather data, ChainSync provides satellite-verified environmental intelligence for superior emergency coordination.
+
 ## API Quick Reference
 
 | Attribute        | Value                                            |
@@ -90,7 +103,7 @@ GET  /health
 | `EnvironmentalServiceVehicle`    | Vehicle type, operator, status, location         |
 | `EnvironmentalEmergencyAlert`    | Facility impact, severity, condition, population |
 | `RegulatoryComplianceReport`     | Submission records, violations, inspections      |
-| `EnvironmentalStationData`       | Weather + air quality sensor readings            |
+| `EnvironmentalStationData`       | Weather + air quality + NASA satellite alerts (wildfire, flood, solar) |
 | `ErrorResponse`                  | Code, message, timestamp for service diagnostics |
 
 > All types are defined in `/types` with examples in `/examples`
