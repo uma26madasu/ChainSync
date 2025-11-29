@@ -411,6 +411,83 @@ For production environments, configure connection pooling in your database conne
 - Free public API
 - Rate limit: Reasonable use policy
 
+### NASA FIRMS Wildfire Alerts
+
+ChainSync integrates NASA's Fire Information for Resource Management System (FIRMS) for real-time wildfire detection.
+
+1. Sign up at https://firms.modaps.eosdis.nasa.gov/api/area/
+2. Request your free API key (VIIRS/MODIS satellite data)
+3. Configure in `config.properties`:
+   ```properties
+   nasa.firms.api.key=YOUR_NASA_FIRMS_KEY_HERE
+   nasa.firms.enabled=true
+   nasa.firms.radius.km=50
+   ```
+
+**Free Tier:**
+- Unlimited API calls
+- Near real-time wildfire detection (VIIRS: 375m resolution)
+- Global coverage
+- Updates every 3-6 hours
+
+### NASA POWER API
+
+NASA's Prediction Of Worldwide Energy Resources (POWER) provides meteorological and solar data.
+
+**No API key required** ✅
+
+- Free public API
+- Documentation: https://power.larc.nasa.gov/docs/
+- Rate limit: Reasonable use policy
+
+**Configured Parameters:**
+```properties
+nasa.power.parameters=T2M,RH2M,WS10M,PRECTOTCORR,ALLSKY_SFC_SW_DWN
+```
+
+- `T2M`: Temperature at 2 meters (°C)
+- `RH2M`: Relative Humidity at 2 meters (%)
+- `WS10M`: Wind Speed at 10 meters (m/s)
+- `PRECTOTCORR`: Precipitation Corrected (mm/hour)
+- `ALLSKY_SFC_SW_DWN`: Solar Irradiance (kW-hr/m²/day)
+
+### NASA EONET Flood Events
+
+NASA's Earth Observatory Natural Event Tracker (EONET) monitors natural hazard events.
+
+**No API key required** ✅
+
+- Free public API for flood event tracking
+- Documentation: https://eonet.gsfc.nasa.gov/docs/v2.1
+- Rate limit: Reasonable use policy
+
+**Configuration:**
+```properties
+nasa.eonet.flood.bbox.size=1
+```
+
+Monitors flood events within ±1 degree latitude/longitude of facility locations.
+
+### NASA GIBS Satellite Imagery
+
+NASA's Global Imagery Browse Services (GIBS) provides satellite imagery URLs.
+
+**No API key required for URL generation** ✅
+
+- Imagery URLs generated on-demand (no downloads in Mule)
+- Documentation: https://wiki.earthdata.nasa.gov/display/GIBS
+- Layer: MODIS Terra Corrected Reflectance True Color
+- Resolution: 250m
+
+**Configuration:**
+```properties
+nasa.gibs.base.url=https://gibs.earthdata.nasa.gov/wmts/epsg4326/best
+nasa.gibs.layer=MODIS_Terra_CorrectedReflectance_TrueColor
+nasa.gibs.resolution=250m
+```
+
+Satellite imagery URLs are only generated for **CRITICAL** alerts (risk score ≥ 8) to provide visual context during emergency coordination meetings.
+
 ### AI Agent Integration
 
 Configure your AI agent endpoint:
@@ -648,7 +725,7 @@ For deployment issues:
 - [ ] All tests passing: `mvn test`
 - [ ] Secure properties configured
 - [ ] Database created and accessible
-- [ ] External API keys obtained
+- [ ] External API keys obtained (OpenWeatherMap, NASA FIRMS)
 - [ ] AI Agent endpoint configured and reachable
 
 ### CloudHub Deployment
