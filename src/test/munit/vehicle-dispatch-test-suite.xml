@@ -284,4 +284,181 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Dispatch Vehicle - Missing Required Fields -->
+    <munit:test name="dispatch-vehicle-missing-dispatch-id-test"
+                description="Test error when dispatchId is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "URGENT",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Invalid Priority -->
+    <munit:test name="dispatch-vehicle-invalid-priority-test"
+                description="Test handling of invalid priority value">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_INVALID",
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "INVALID_PRIORITY",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected dispatch to process even with invalid priority"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Missing Destination -->
+    <munit:test name="dispatch-vehicle-missing-destination-test"
+                description="Test error when destination is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_NO_DEST",
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "URGENT"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Missing Authorization -->
+    <munit:test name="dispatch-vehicle-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_007",
+  "taskType": "ROUTINE_INSPECTION",
+  "priority": "MEDIUM",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  }
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Malformed JSON -->
+    <munit:test name="dispatch-vehicle-malformed-json-test"
+                description="Test error with malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[{
+  "dispatchId": "DISPATCH_008"
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "URGENT"
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Invalid Coordinates -->
+    <munit:test name="dispatch-vehicle-invalid-coordinates-test"
+                description="Test handling of invalid coordinate values">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_009",
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "HIGH",
+  "destination": {
+    "lat": 999.9999,
+    "lon": -999.9999
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected dispatch to process even with invalid coordinates"/>
+        </munit:validation>
+
+    </munit:test>
+
 </mule>

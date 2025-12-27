@@ -276,4 +276,110 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Submit Station Reading - Missing Sensor Type -->
+    <munit:test name="submit-station-reading-missing-sensor-type-test"
+                description="Test error when sensorType is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "submittedBy": "Tech_001",
+  "data": {
+    "temperature": 25.5
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Missing Authorization -->
+    <munit:test name="submit-station-reading-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorType": "WATER_QUALITY",
+  "data": {
+    "E.coli": "Not Detected"
+  }
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Malformed JSON -->
+    <munit:test name="submit-station-reading-malformed-json-test"
+                description="Test error with malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001/readings">
+                <http:body><![CDATA[{
+  "sensorType": "WATER_QUALITY"
+  "data": {
+    "E.coli": "Not Detected"
+  }
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Empty Data Object -->
+    <munit:test name="submit-station-reading-empty-data-test"
+                description="Test handling of empty data object">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorType": "AIR_MONITORING",
+  "data": {}
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.processingStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected processing even with empty data"/>
+        </munit:validation>
+
+    </munit:test>
+
 </mule>

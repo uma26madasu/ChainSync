@@ -248,4 +248,63 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Get Driver Safety Alerts - Missing Authorization -->
+    <munit:test name="get-driver-safety-alerts-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/driver-safety-alerts">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Get Route Optimization - Invalid Parameters -->
+    <munit:test name="get-route-optimization-invalid-params-test"
+                description="Test handling of invalid query parameters">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/route-optimization">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"origin" : "",
+	"destination" : "",
+	"vehicleId" : "INVALID@VEHICLE"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected route optimization even with invalid params"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Route Optimization - Missing Authorization -->
+    <munit:test name="get-route-optimization-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/route-optimization">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>

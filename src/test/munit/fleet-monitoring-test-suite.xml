@@ -384,4 +384,77 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Get Fleet Monitoring - Missing Authorization -->
+    <munit:test name="get-fleet-monitoring-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Get Enhanced Fleet Monitoring - Missing Authorization -->
+    <munit:test name="get-enhanced-fleet-monitoring-missing-auth-test"
+                description="Test error when Authorization header is missing for enhanced data"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring/enhanced">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post Fleet Alert - Missing Authorization -->
+    <munit:test name="post-fleet-alert-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/fleet-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "vehicleId": "TRUCK_001",
+  "alertType": "MAINTENANCE",
+  "severity": "HIGH",
+  "message": "Test alert"
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post Fleet Alert - Malformed JSON -->
+    <munit:test name="post-fleet-alert-malformed-json-test"
+                description="Test error with malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/fleet-alerts">
+                <http:body><![CDATA[{
+  "vehicleId": "TRUCK_001"
+  "alertType": "MAINTENANCE",
+  "severity": "HIGH"
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>
