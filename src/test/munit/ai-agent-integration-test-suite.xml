@@ -330,4 +330,140 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Get Environmental Data - Invalid Facility ID Format -->
+    <munit:test name="get-environmental-data-invalid-facility-format-test"
+                description="Test handling of invalid facility ID format">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/environmental/@INVALID@FACILITY@">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error for invalid facility format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post AI Alert - Missing Severity -->
+    <munit:test name="post-ai-alert-missing-severity-test"
+                description="Test alert submission with missing severity">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "ALERT_ERR_001",
+  "facilityId": "water-treatment-1",
+  "message": "Test alert without severity"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected processing even without severity"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Emergency - Empty Type -->
+    <munit:test name="post-emergency-empty-type-test"
+                description="Test emergency with empty type field">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/emergency">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "EMRG_ERR_001",
+  "facilityId": "water-treatment-1",
+  "type": "",
+  "severity": "HIGH"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected emergency processing even with empty type"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post AI Alert - Missing Authorization -->
+    <munit:test name="post-ai-alert-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "ALERT_ERR_002",
+  "facilityId": "water-treatment-1",
+  "severity": "HIGH",
+  "message": "Test alert"
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post Emergency - Malformed JSON -->
+    <munit:test name="post-emergency-malformed-json-test"
+                description="Test error with malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/emergency">
+                <http:body><![CDATA[{
+  "id": "EMRG_ERR_002"
+  "facilityId": "water-treatment-1",
+  "type": "SPILL"
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>

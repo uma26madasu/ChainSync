@@ -298,4 +298,212 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Post Water Quality Alert - Missing Required Fields -->
+    <munit:test name="post-water-alert-missing-facility-id-test"
+                description="Test error when facilityId is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "alertType": "CONTAMINATION",
+  "parameter": "eColi",
+  "value": 1,
+  "threshold": 0
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Invalid Parameter -->
+    <munit:test name="post-water-alert-invalid-parameter-test"
+                description="Test handling of invalid parameter name">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "PARAMETER_EXCEEDANCE",
+  "parameter": "INVALID_PARAM",
+  "value": 100,
+  "threshold": 50
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.alertId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alert to be created even with invalid parameter"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Negative Values -->
+    <munit:test name="post-water-alert-negative-value-test"
+                description="Test handling of negative values">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "PARAMETER_EXCEEDANCE",
+  "parameter": "ph",
+  "value": -5.0,
+  "threshold": 6.5
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected CRITICAL severity for extreme pH"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Missing Authorization -->
+    <munit:test name="post-water-alert-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "CONTAMINATION",
+  "parameter": "eColi",
+  "value": 1,
+  "threshold": 0
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Get Water Quality - Missing Authorization -->
+    <munit:test name="get-water-quality-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/FACILITY_001">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Malformed JSON -->
+    <munit:test name="post-water-alert-malformed-json-test"
+                description="Test error with malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[{
+  "facilityId": "FACILITY_001"
+  "alertType": "CONTAMINATION",
+  "parameter": "eColi"
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Invalid Alert Type -->
+    <munit:test name="post-water-alert-invalid-type-test"
+                description="Test handling of invalid alert type">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "INVALID_TYPE",
+  "parameter": "ph",
+  "value": 9.0,
+  "threshold": 8.5
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.immediateActions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected actions even with invalid alert type"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Water Quality - Empty Facility ID -->
+    <munit:test name="get-water-quality-empty-facility-id-test"
+                description="Test error with empty facility ID"
+                expectedErrorType="HTTP:NOT_FOUND">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>

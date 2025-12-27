@@ -321,4 +321,224 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Post IoT Sensor - Missing Required Fields -->
+    <munit:test name="post-iot-missing-sensor-id-test"
+                description="Test error when sensorId is missing"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "sensorType": "METHANE",
+  "readings": {
+    "methane_ppm": 1500
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor - Invalid Sensor Type -->
+    <munit:test name="post-iot-invalid-sensor-type-test"
+                description="Test handling of invalid sensor type">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "SENSOR_999",
+  "facilityId": "FACILITY_001",
+  "sensorType": "INVALID_TYPE",
+  "readings": {
+    "value": 123
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('PROCESSED')]"
+                message="Expected generic processing for unknown sensor type"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor - Missing Authorization Header -->
+    <munit:test name="post-iot-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "METHANE",
+  "readings": {
+    "methane_ppm": 1000
+  }
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor - Malformed JSON -->
+    <munit:test name="post-iot-malformed-json-test"
+                description="Test error handling for malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[{
+  "sensorId": "SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "METHANE"
+  "readings": {
+    "methane_ppm": 1000
+  }
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor - Negative Values -->
+    <munit:test name="post-iot-negative-values-test"
+                description="Test handling of negative sensor values">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "METHANE",
+  "readings": {
+    "methane_ppm": -100
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('PROCESSED')]"
+                message="Expected processing even with negative values"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Air Quality - Invalid Facility ID Format -->
+    <munit:test name="get-air-quality-invalid-facility-format-test"
+                description="Test error for invalid facility ID format">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/esg/air-quality/INVALID@FACILITY#ID">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error for invalid facility ID format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor - Missing Readings Object -->
+    <munit:test name="post-iot-missing-readings-test"
+                description="Test error when readings object is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "METHANE"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor - Wrong Content-Type -->
+    <munit:test name="post-iot-wrong-content-type-test"
+                description="Test error with wrong content type"
+                expectedErrorType="HTTP:UNSUPPORTED_MEDIA_TYPE">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[sensorId=SENSOR_001&facilityId=FACILITY_001]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/x-www-form-urlencoded"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>

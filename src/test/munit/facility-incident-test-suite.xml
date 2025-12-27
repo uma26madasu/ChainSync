@@ -290,4 +290,139 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Report Incident - Missing Severity -->
+    <munit:test name="report-incident-missing-severity-test"
+                description="Test error when severity is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_ERR_001",
+  "incidentType": "SAFETY_VIOLATION",
+  "description": "Test incident",
+  "reportedBy": "Test_User"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Report Incident - Invalid Severity -->
+    <munit:test name="report-incident-invalid-severity-test"
+                description="Test handling of invalid severity value">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_ERR_002",
+  "incidentType": "SAFETY_VIOLATION",
+  "severity": "INVALID_SEVERITY",
+  "description": "Test incident",
+  "reportedBy": "Test_User"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected incident processing even with invalid severity"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Report Incident - Missing Authorization -->
+    <munit:test name="report-incident-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_ERR_003",
+  "incidentType": "SAFETY_VIOLATION",
+  "severity": "LOW",
+  "description": "Test incident"
+}]]]></http:body>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Report Incident - Malformed JSON -->
+    <munit:test name="report-incident-malformed-json-test"
+                description="Test error with malformed JSON"
+                expectedErrorType="HTTP:BAD_REQUEST">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[{
+  "incidentId": "INC_ERR_004"
+  "incidentType": "SAFETY_VIOLATION",
+  "severity": "LOW"
+}]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Report Incident - Missing Description -->
+    <munit:test name="report-incident-missing-description-test"
+                description="Test handling when description is missing"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_ERR_005",
+  "incidentType": "EQUIPMENT_FAILURE",
+  "severity": "MEDIUM",
+  "reportedBy": "Test_User"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>

@@ -312,4 +312,56 @@
 
     </munit:test>
 
+    <!-- ERROR HANDLING TESTS -->
+
+    <!-- Test: Get All Service Vehicles - Missing Authorization -->
+    <munit:test name="get-all-service-vehicles-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Get Single Vehicle - Special Characters -->
+    <munit:test name="get-single-vehicle-special-chars-test"
+                description="Test handling of vehicle ID with special characters">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/VEHICLE@INVALID#ID">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error for invalid vehicle ID"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Vehicle - Missing Authorization -->
+    <munit:test name="get-single-vehicle-missing-auth-test"
+                description="Test error when Authorization header is missing"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
 </mule>
