@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="facility-incident-test-suite.xml" />
+
+    <!-- Test Suite for Facility Incident Reporting -->
+
+    <!-- Test: Report Facility Incident - Critical Contamination -->
+    <munit:test name="report-facility-incident-critical-contamination-test"
+                description="Test reporting critical contamination incident">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_001",
+  "incidentType": "CONTAMINATION_BREACH",
+  "severity": "CRITICAL",
+  "description": "Chemical spill detected in containment area",
+  "reportedBy": "Facility_Manager_001",
+  "containmentActions": "Area isolated, emergency protocols activated",
+  "timestamp": "2025-12-27T09:00:00Z"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.incidentId]"
+                is="#[MunitTools::equalTo('INC_001')]"
+                message="Expected incidentId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected CRITICAL severity"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.reviewStatus]"
+                is="#[MunitTools::equalTo('IMMEDIATE_REVIEW')]"
+                message="Expected IMMEDIATE_REVIEW status for critical incident"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.responseWorkflow.emergencyCoordinationRequired]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected emergency coordination for critical incident"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.slotifyIntegration.enabled]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected Slotify integration enabled"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Report Facility Incident - High Equipment Failure -->
+    <munit:test name="report-facility-incident-high-equipment-failure-test"
+                description="Test reporting high severity equipment failure">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_002/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_002",
+  "incidentType": "EQUIPMENT_FAILURE",
+  "severity": "HIGH",
+  "description": "Primary treatment pump failure",
+  "reportedBy": "Operations_Chief_002",
+  "containmentActions": "Backup systems activated"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.reviewStatus]"
+                is="#[MunitTools::equalTo('URGENT_REVIEW')]"
+                message="Expected URGENT_REVIEW for high severity"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.assignedTeam]"
+                is="#[MunitTools::equalTo('Emergency_Engineering_Team')]"
+                message="Expected Emergency Engineering Team assignment"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.responseWorkflow.immediateActions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected immediate actions list"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Report Facility Incident - Safety Violation -->
+    <munit:test name="report-facility-incident-safety-violation-test"
+                description="Test reporting safety violation incident">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_003/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_003",
+  "incidentType": "SAFETY_VIOLATION",
+  "severity": "MEDIUM",
+  "description": "PPE protocol not followed",
+  "reportedBy": "Safety_Officer_003",
+  "containmentActions": "Staff briefing scheduled"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.assignedTeam]"
+                is="#[MunitTools::equalTo('Safety_Compliance_Team')]"
+                message="Expected Safety Compliance Team assignment"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.followUpActions.trainingRequired]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected training to be required for safety violation"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Report Facility Incident - Facility Not Found -->
+    <munit:test name="report-facility-incident-facility-not-found-test"
+                description="Test error response for non-existent facility">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/NONEXISTENT_FACILITY/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_004",
+  "incidentType": "EQUIPMENT_FAILURE",
+  "severity": "LOW",
+  "description": "Test incident",
+  "reportedBy": "Test_User"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('FACILITY_NOT_FOUND')]"
+                message="Expected FACILITY_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Report Facility Incident - Regulatory Notification -->
+    <munit:test name="report-facility-incident-regulatory-notification-test"
+                description="Test incident requiring regulatory notification">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_005",
+  "incidentType": "CONTAMINATION_BREACH",
+  "severity": "CRITICAL",
+  "description": "Wastewater discharge above permitted levels",
+  "reportedBy": "Compliance_Officer_001",
+  "containmentActions": "Discharge stopped, containment measures implemented"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.regulatoryNotification.required]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected regulatory notification to be required"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.regulatoryNotification.notificationDeadline]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected notification deadline"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.regulatoryNotification.agencies]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected agencies list"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Report Facility Incident - Response Workflow -->
+    <munit:test name="report-facility-incident-response-workflow-test"
+                description="Test incident response workflow creation">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_002/incidents">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "incidentId": "INC_006",
+  "incidentType": "EQUIPMENT_FAILURE",
+  "severity": "CRITICAL",
+  "description": "Complete treatment system failure",
+  "reportedBy": "Operations_Manager_002",
+  "containmentActions": "Emergency bypass activated"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.responseWorkflow.workflowId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected workflow ID"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.responseWorkflow.estimatedResponseTime]"
+                is="#[MunitTools::equalTo('15 minutes')]"
+                message="Expected 15 minute response time for critical incident"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.responseWorkflow.coordinationMeeting.required]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected coordination meeting for critical incident"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

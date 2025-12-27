@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="ai-agent-integration-test-suite.xml" />
+
+    <!-- Test Suite for AI Agent Integration -->
+
+    <!-- Test: Get Environmental Data for AI Agent - Water Treatment Facility -->
+    <munit:test name="get-environmental-data-water-treatment-test"
+                description="Test retrieval of environmental data for water treatment facility">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/api/environmental/water-treatment-1">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityId]"
+                is="#[MunitTools::equalTo('water-treatment-1')]"
+                message="Expected facilityId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityType]"
+                is="#[MunitTools::equalTo('WATER_TREATMENT')]"
+                message="Expected WATER_TREATMENT facility type"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.waterQuality]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected water quality data for water treatment facility"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.environmental]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected environmental data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Environmental Data for AI Agent - Waste Processing Facility -->
+    <munit:test name="get-environmental-data-waste-processing-test"
+                description="Test retrieval of environmental data for waste processing facility">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/api/environmental/waste-processing-1">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.facilityType]"
+                is="#[MunitTools::equalTo('WASTE_PROCESSING')]"
+                message="Expected WASTE_PROCESSING facility type"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.gasLevels]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected gas levels data for waste facility"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.gasLevels.methane]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected methane reading"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Environmental Data for AI Agent - Energy Generation Facility -->
+    <munit:test name="get-environmental-data-energy-generation-test"
+                description="Test retrieval of environmental data for energy generation facility">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/api/environmental/energy-gen-1">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.facilityType]"
+                is="#[MunitTools::equalTo('ENERGY_GENERATION')]"
+                message="Expected ENERGY_GENERATION facility type"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emissions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected emissions data for energy facility"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emissions.co2]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected CO2 emissions data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post AI Alert - Critical Severity -->
+    <munit:test name="post-ai-alert-critical-test"
+                description="Test submission of critical AI alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "ALERT_001",
+  "facilityId": "water-treatment-1",
+  "severity": "CRITICAL",
+  "message": "E. coli detected above safe levels"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('alert_received')]"
+                message="Expected alert_received status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected CRITICAL severity in response"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.actions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected actions list"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post AI Alert - High Priority -->
+    <munit:test name="post-ai-alert-high-priority-test"
+                description="Test submission of high priority AI alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "ALERT_002",
+  "facilityId": "waste-processing-1",
+  "severity": "HIGH",
+  "message": "Methane levels approaching threshold"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('alert_received')]"
+                message="Expected alert_received status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.chainSyncProcessed]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected ChainSync processing confirmation"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post AI Alert - Missing Facility ID -->
+    <munit:test name="post-ai-alert-missing-facility-id-test"
+                description="Test error response when facility ID is missing">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "ALERT_003",
+  "severity": "MEDIUM",
+  "message": "Test alert without facility ID"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('MISSING_FACILITY_ID')]"
+                message="Expected MISSING_FACILITY_ID error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Emergency Notification - Critical -->
+    <munit:test name="post-emergency-critical-test"
+                description="Test submission of critical emergency notification">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/emergency">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "EMERGENCY_001",
+  "facilityId": "water-treatment-1",
+  "type": "CONTAMINATION_EVENT",
+  "severity": "CRITICAL"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('emergency_received')]"
+                message="Expected emergency_received status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.response]"
+                is="#[MunitTools::equalTo('EMERGENCY_PROTOCOLS_ACTIVATED')]"
+                message="Expected emergency protocols activation"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.actions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected emergency actions list"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Emergency Notification - Missing Facility ID -->
+    <munit:test name="post-emergency-missing-facility-id-test"
+                description="Test error response for emergency without facility ID">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/emergency">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "id": "EMERGENCY_002",
+  "type": "TEST_EMERGENCY",
+  "severity": "CRITICAL"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('MISSING_FACILITY_ID')]"
+                message="Expected MISSING_FACILITY_ID error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

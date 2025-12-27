@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="water-quality-monitoring-test-suite.xml" />
+
+    <!-- Test Suite for Water Quality Monitoring Endpoints -->
+
+    <!-- Test: Get Water Quality Data - Success -->
+    <munit:test name="get-water-quality-success-test"
+                description="Test successful retrieval of water quality data for a facility">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/FACILITY_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityId]"
+                is="#[MunitTools::equalTo('FACILITY_001')]"
+                message="Expected facilityId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.waterQualityParameters]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected water quality parameters"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.waterQualityParameters.ph]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected pH parameter"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.waterQualityIndex]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected water quality index"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Water Quality - Facility Not Found -->
+    <munit:test name="get-water-quality-facility-not-found-test"
+                description="Test error response when facility is not found">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/NONEXISTENT_FACILITY">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object in response"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('FACILITY_NOT_FOUND')]"
+                message="Expected FACILITY_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Contamination -->
+    <munit:test name="post-water-quality-contamination-alert-test"
+                description="Test submission of contamination alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "CONTAMINATION",
+  "parameter": "eColi",
+  "value": 1,
+  "threshold": 0
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.alertId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alert ID to be generated"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected CRITICAL severity for E.coli detection"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.publicHealthResponse.advisoryRequired]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected public health advisory to be required"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - pH Exceedance -->
+    <munit:test name="post-water-quality-ph-exceedance-alert-test"
+                description="Test submission of pH exceedance alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "PARAMETER_EXCEEDANCE",
+  "parameter": "ph",
+  "value": 9.5,
+  "threshold": 8.5
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected CRITICAL severity for extreme pH"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.regulatoryResponse.notificationRequired]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected regulatory notification to be required"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Water Quality Alert - Turbidity Warning -->
+    <munit:test name="post-water-quality-turbidity-alert-test"
+                description="Test submission of turbidity warning alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "alertType": "PARAMETER_EXCEEDANCE",
+  "parameter": "turbidity",
+  "value": 12,
+  "threshold": 5
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('HIGH')]"
+                message="Expected HIGH severity for turbidity exceedance"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.immediateActions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected immediate actions list"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Water Quality - Dissolved Oxygen Low -->
+    <munit:test name="post-water-quality-dissolved-oxygen-alert-test"
+                description="Test submission of low dissolved oxygen alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_002",
+  "alertType": "PARAMETER_EXCEEDANCE",
+  "parameter": "dissolvedOxygen",
+  "value": 2.5,
+  "threshold": 5.0
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.severity]"
+                is="#[MunitTools::equalTo('HIGH')]"
+                message="Expected HIGH severity for low DO"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinationWorkflow.emergencyMeetingRequired]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected coordination workflow information"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Water Quality Data - Compliance Check -->
+    <munit:test name="get-water-quality-compliance-check-test"
+                description="Test water quality compliance verification">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/water-quality/FACILITY_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.compliance]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected compliance object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.compliance.overallStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected overall compliance status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.compliance.epaCompliant]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected EPA compliance status"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="station-readings-test-suite.xml" />
+
+    <!-- Test Suite for Station Readings Submission -->
+
+    <!-- Test: Submit Station Reading - Water Quality Success -->
+    <munit:test name="submit-station-reading-water-quality-success-test"
+                description="Test successful submission of water quality reading">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "submittedBy": "Technician_001",
+  "sensorType": "WATER_QUALITY",
+  "data": {
+    "E.coli": "Not Detected",
+    "turbidity": 0.5,
+    "ph": 7.2,
+    "dissolvedOxygen": 8.5
+  },
+  "readingTimestamp": "2025-12-27T10:00:00Z",
+  "notes": "Routine morning sample"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.stationId]"
+                is="#[MunitTools::equalTo('STATION_001')]"
+                message="Expected stationId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.sensorType]"
+                is="#[MunitTools::equalTo('WATER_QUALITY')]"
+                message="Expected sensorType to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.processingStatus]"
+                is="#[MunitTools::equalTo('ACCEPTED')]"
+                message="Expected ACCEPTED processing status"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Air Monitoring -->
+    <munit:test name="submit-station-reading-air-monitoring-success-test"
+                description="Test successful submission of air monitoring reading">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_CENTRAL_001/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "submittedBy": "Technician_002",
+  "sensorType": "AIR_MONITORING",
+  "data": {
+    "pm25": 25.4,
+    "pm10": 32.1,
+    "no2": 45.2,
+    "o3": 78.9
+  },
+  "readingTimestamp": "2025-12-27T10:30:00Z"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.processingStatus]"
+                is="#[MunitTools::equalTo('ACCEPTED')]"
+                message="Expected ACCEPTED status for clean air reading"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.message]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected processing message"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Soil Analysis -->
+    <munit:test name="submit-station-reading-soil-analysis-test"
+                description="Test submission of soil analysis reading">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_002/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "submittedBy": "Lab_Analyst_001",
+  "sensorType": "SOIL_ANALYSIS",
+  "data": {
+    "heavyMetals": "Within limits",
+    "organicMatter": 4.5,
+    "pH": 6.8
+  },
+  "notes": "Quarterly soil test"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.processingStatus]"
+                is="#[MunitTools::equalTo('QUEUED')]"
+                message="Expected QUEUED status for soil analysis"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.submittedBy]"
+                is="#[MunitTools::equalTo('Lab_Analyst_001')]"
+                message="Expected submittedBy to match request"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Invalid Station ID -->
+    <munit:test name="submit-station-reading-invalid-station-test"
+                description="Test error response for invalid station ID">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/INVALID_STATION/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "submittedBy": "Technician_003",
+  "sensorType": "WATER_QUALITY",
+  "data": {
+    "E.coli": "Not Detected"
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('STATION_NOT_FOUND')]"
+                message="Expected STATION_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - System Submitted -->
+    <munit:test name="submit-station-reading-system-submitted-test"
+                description="Test submission with default SYSTEM submitter">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_CENTRAL_002/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorType": "WATER_QUALITY",
+  "data": {
+    "E.coli": "Not Detected",
+    "chlorine": 2.1
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.submittedBy]"
+                is="#[MunitTools::equalTo('SYSTEM')]"
+                message="Expected SYSTEM as default submitter"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.processingStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected processing status"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Submit Station Reading - Timestamp Verification -->
+    <munit:test name="submit-station-reading-timestamp-test"
+                description="Test reading ingestion with timestamp tracking">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION_001/readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorType": "AIR_MONITORING",
+  "data": {
+    "pm25": 15.2
+  },
+  "readingTimestamp": "2025-12-27T11:00:00Z"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.readingTimestamp]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected reading timestamp"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.ingestedAt]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected ingestion timestamp"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

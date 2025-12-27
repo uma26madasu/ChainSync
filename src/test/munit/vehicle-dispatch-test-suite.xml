@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="vehicle-dispatch-test-suite.xml" />
+
+    <!-- Test Suite for Vehicle Dispatch Operations -->
+
+    <!-- Test: Dispatch Vehicle - Success -->
+    <munit:test name="dispatch-vehicle-success-test"
+                description="Test successful vehicle dispatch">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_001",
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "URGENT",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  },
+  "dispatchWindow": {
+    "start": "2025-12-27T10:00:00Z",
+    "end": "2025-12-27T12:00:00Z"
+  },
+  "notes": "Water contamination emergency"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.dispatchId]"
+                is="#[MunitTools::equalTo('DISPATCH_001')]"
+                message="Expected dispatchId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('IN_TRANSIT')]"
+                message="Expected status to be IN_TRANSIT"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.estimatedArrival]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected estimated arrival time"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.trackingURL]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected tracking URL"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Vehicle Not Found -->
+    <munit:test name="dispatch-vehicle-not-found-test"
+                description="Test dispatch for non-existent vehicle">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/NONEXISTENT_VEHICLE/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_002",
+  "taskType": "ROUTINE_INSPECTION",
+  "priority": "MEDIUM",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('VEHICLE_NOT_FOUND')]"
+                message="Expected VEHICLE_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Urgent Priority with Coordination -->
+    <munit:test name="dispatch-vehicle-urgent-with-coordination-test"
+                description="Test urgent dispatch triggers coordination workflow">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_003",
+  "taskType": "HAZMAT_SPILL",
+  "priority": "URGENT",
+  "destination": {
+    "lat": 33.7590,
+    "lon": -84.3780
+  },
+  "notes": "Chemical spill at waste facility"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.coordinationWorkflow.workflowTriggered]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected coordination workflow to be triggered for urgent dispatch"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinationWorkflow.slotifyIntegration.enabled]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected Slotify integration to be enabled"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - High Priority -->
+    <munit:test name="dispatch-vehicle-high-priority-test"
+                description="Test high priority dispatch">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_004",
+  "taskType": "WATER_QUALITY_ISSUE",
+  "priority": "HIGH",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  },
+  "notes": "Elevated turbidity levels"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.dispatchDetails.priority]"
+                is="#[MunitTools::equalTo('HIGH')]"
+                message="Expected HIGH priority in dispatch details"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinationWorkflow.workflowTriggered]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected coordination for HIGH priority dispatch"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Medium Priority -->
+    <munit:test name="dispatch-vehicle-medium-priority-test"
+                description="Test medium priority dispatch without coordination">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_005",
+  "taskType": "ROUTINE_SAMPLING",
+  "priority": "MEDIUM",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  },
+  "notes": "Weekly water quality sampling"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('IN_TRANSIT')]"
+                message="Expected IN_TRANSIT status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinationWorkflow.workflowTriggered]"
+                is="#[MunitTools::equalTo(false)]"
+                message="Expected no coordination for MEDIUM priority dispatch"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Dispatch Vehicle - Estimated Time Verification -->
+    <munit:test name="dispatch-vehicle-eta-verification-test"
+                description="Test ETA calculation based on priority">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001/dispatch">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "dispatchId": "DISPATCH_006",
+  "taskType": "EMERGENCY_RESPONSE",
+  "priority": "URGENT",
+  "destination": {
+    "lat": 33.7490,
+    "lon": -84.3880
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.estimatedArrival]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected ETA to be calculated"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.dispatchDetails.expectedCompletion]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected completion time to be calculated"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>
