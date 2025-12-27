@@ -179,4 +179,515 @@
 
     </munit:test>
 
+    <!-- ==================== GLOBAL ERROR RESPONSE FORMAT CONSISTENCY ==================== -->
+
+    <!-- Test: Error Response Format - Environmental Facilities -->
+    <munit:test name="error-response-format-facilities-test"
+                description="Validate consistent error response format for facilities endpoint">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/NONEXISTENT">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error code in standard format"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error message"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.timestamp]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected timestamp in error response"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Error Response Format - Fleet Monitoring -->
+    <munit:test name="error-response-format-fleet-test"
+                description="Validate consistent error response format for fleet endpoint">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring/NONEXISTENT_VEHICLE">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object in standard format"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('VEHICLE_NOT_FOUND')]"
+                message="Expected standard error code format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Error Response Format - Environmental Data -->
+    <munit:test name="error-response-format-env-data-test"
+                description="Validate consistent error response format for environmental data endpoint">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/NONEXISTENT_STATION">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('STATION_NOT_FOUND')]"
+                message="Expected consistent error code format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- ==================== AUTHENTICATION & AUTHORIZATION ACROSS ALL ENDPOINTS ==================== -->
+
+    <!-- Test: Missing Auth - Multiple GET Endpoints -->
+    <munit:test name="missing-auth-multiple-get-endpoints-test"
+                description="Validate 401 Unauthorized across multiple GET endpoints"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data">
+                <!-- No Authorization header -->
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <munit:test name="missing-auth-fleet-monitoring-test"
+                description="Validate 401 Unauthorized for fleet monitoring"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <munit:test name="missing-auth-service-vehicles-test"
+                description="Validate 401 Unauthorized for service vehicles"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles">
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Invalid Auth Token Format -->
+    <munit:test name="invalid-auth-token-format-test"
+                description="Test invalid authorization token format"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "InvalidToken"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Empty Auth Token -->
+    <munit:test name="empty-auth-token-test"
+                description="Test empty authorization token"
+                expectedErrorType="HTTP:UNAUTHORIZED">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : ""
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- ==================== COMMON VALIDATION ACROSS ALL APIs ==================== -->
+
+    <!-- Test: Special Characters in Resource IDs Across Endpoints -->
+    <munit:test name="special-chars-facility-id-test"
+                description="Test special characters in facility ID">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FAC@#$%ID">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error for invalid ID format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <munit:test name="special-chars-station-id-test"
+                description="Test special characters in station ID">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/STATION<>@#">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error for invalid station ID format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: SQL Injection Attempt -->
+    <munit:test name="sql-injection-attempt-test"
+                description="Test protection against SQL injection in IDs">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY' OR '1'='1">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error - system should reject SQL injection attempts"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: XSS Attempt -->
+    <munit:test name="xss-attempt-test"
+                description="Test protection against XSS in request">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/<script>alert('XSS')</script>">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error - system should reject XSS attempts"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Empty Request Body for POST Endpoints -->
+    <munit:test name="empty-request-body-test"
+                description="Test empty request body handling"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: Null JSON Object -->
+    <munit:test name="null-json-object-test"
+                description="Test null JSON object handling"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[null]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- ==================== HTTP METHOD VALIDATION ACROSS ENDPOINTS ==================== -->
+
+    <!-- Test: PUT Method on GET-only Endpoint -->
+    <munit:test name="put-on-get-only-endpoint-test"
+                description="Test PUT method on GET-only endpoint"
+                expectedErrorType="HTTP:METHOD_NOT_ALLOWED">
+
+        <munit:execution>
+            <http:request method="PUT" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- Test: PATCH Method Not Supported -->
+    <munit:test name="patch-method-not-supported-test"
+                description="Test PATCH method on endpoints that don't support it"
+                expectedErrorType="HTTP:METHOD_NOT_ALLOWED">
+
+        <munit:execution>
+            <http:request method="PATCH" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/FACILITY_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- ==================== PAYLOAD SIZE & LIMITS ==================== -->
+
+    <!-- Test: Extremely Large Payload -->
+    <munit:test name="extremely-large-payload-test"
+                description="Test handling of extremely large JSON payload"
+                expectedErrorType="ANY"
+                ignore="true">
+
+        <munit:execution>
+            <set-variable variableName="largePayload" value="#['{'++ ('x' * 1000000) ++ '}']"/>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[#[vars.largePayload]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- ==================== CORS & HEADERS VALIDATION ==================== -->
+
+    <!-- Test: Missing Content-Type for POST -->
+    <munit:test name="missing-content-type-post-test"
+                description="Test POST request with missing Content-Type header"
+                expectedErrorType="ANY">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/environmental-emergency-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "facilityId": "FACILITY_001",
+  "emergencyType": "TEST"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+    </munit:test>
+
+    <!-- ==================== CONCURRENT REQUEST HANDLING ==================== -->
+
+    <!-- Test: Concurrent Requests to Same Resource -->
+    <munit:test name="concurrent-requests-same-resource-test"
+                description="Test handling of concurrent requests to same resource"
+                ignore="true">
+
+        <munit:execution>
+            <parallel-foreach collection="#[1 to 10]">
+                <http:request method="GET" config-ref="HTTP_Request_configuration"
+                             path="/environmental-facilities/FACILITY_001">
+                    <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+                </http:request>
+            </parallel-foreach>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected successful handling of concurrent requests"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- ==================== ERROR CODE CONSISTENCY ==================== -->
+
+    <!-- Test: 404 Consistency Across Endpoints -->
+    <munit:test name="404-consistency-facilities-test"
+                description="Test 404 error format consistency for facilities">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities/NONEXISTENT_FAC_999">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::containsString('NOT_FOUND')]"
+                message="Expected consistent NOT_FOUND error code format"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <munit:test name="404-consistency-vehicles-test"
+                description="Test 404 error format consistency for vehicles">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/NONEXISTENT_VEH_999">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::containsString('NOT_FOUND')]"
+                message="Expected consistent NOT_FOUND error code format across all endpoints"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- ==================== GLOBAL EXCEPTION HANDLING ==================== -->
+
+    <!-- Test: Internal Server Error Handling -->
+    <munit:test name="internal-server-error-handling-test"
+                description="Test graceful handling of internal server errors"
+                ignore="true">
+
+        <munit:execution>
+            <!-- This would need to trigger an actual internal error -->
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-facilities">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object even for internal errors"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error code for internal errors"/>
+        </munit:validation>
+
+    </munit:test>
+
 </mule>
