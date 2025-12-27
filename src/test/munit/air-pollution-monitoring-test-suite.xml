@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="air-pollution-monitoring-test-suite.xml" />
+
+    <!-- Test Suite for Air Pollution Monitoring & ESG Reporting Endpoints -->
+
+    <!-- Test: Get ESG Air Quality Data - Success -->
+    <munit:test name="get-esg-air-quality-success-test"
+                description="Test successful retrieval of ESG air quality data for a facility">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/esg/air-quality/FACILITY_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.facilityId]"
+                is="#[MunitTools::equalTo('FACILITY_001')]"
+                message="Expected facilityId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.esgMetrics]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected ESG metrics to be present"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.esgMetrics.airQualityIndex]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected air quality index to be present"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.regulatoryCompliance]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected regulatory compliance data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get ESG Air Quality - Facility Not Found -->
+    <munit:test name="get-esg-air-quality-facility-not-found-test"
+                description="Test error response when facility is not found">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/esg/air-quality/NONEXISTENT_FACILITY">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object in response"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('FACILITY_NOT_FOUND')]"
+                message="Expected FACILITY_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor Reading - Methane -->
+    <munit:test name="post-iot-methane-reading-success-test"
+                description="Test successful submission of methane sensor data">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "METHANE_SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "METHANE",
+  "readings": {
+    "methane_ppm": 1500
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('PROCESSED')]"
+                message="Expected PROCESSED status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.methaneAnalysis]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected methane analysis data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.compliance]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected compliance data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor Reading - Air Quality -->
+    <munit:test name="post-iot-air-quality-reading-success-test"
+                description="Test successful submission of air quality sensor data">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "AQ_SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "AIR_QUALITY",
+  "readings": {
+    "pm25": 25.4,
+    "pm10": 32.1,
+    "co2": 450,
+    "voc": 120
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('PROCESSED')]"
+                message="Expected PROCESSED status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.airQualityAnalysis]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected air quality analysis data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post IoT Sensor Reading - Critical Methane Level -->
+    <munit:test name="post-iot-critical-methane-level-test"
+                description="Test methane reading with critical alert level">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "METHANE_SENSOR_002",
+  "facilityId": "FACILITY_002",
+  "sensorType": "METHANE",
+  "readings": {
+    "methane_ppm": 6000
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.methaneAnalysis.riskLevel]"
+                is="#[MunitTools::equalTo('CRITICAL')]"
+                message="Expected CRITICAL risk level for high methane concentration"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.alerts.triggered]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected alert to be triggered"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.nextAction]"
+                is="#[MunitTools::equalTo('IMMEDIATE_RESPONSE')]"
+                message="Expected IMMEDIATE_RESPONSE action"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: ESG Report Generation - Success -->
+    <munit:test name="generate-esg-report-success-test"
+                description="Test successful generation of comprehensive ESG report">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/api/esg/reports/generate">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.reportId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected report ID to be generated"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.executiveSummary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected executive summary in report"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.environmentalMetrics]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected environmental metrics in report"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.regulatoryCompliance]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected regulatory compliance in report"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.investorDisclosures]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected investor disclosures in report"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: IoT Sensor - Generic Sensor Type -->
+    <munit:test name="post-iot-generic-sensor-reading-test"
+                description="Test submission of generic sensor data">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/esg/iot-readings">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "sensorId": "TEMP_SENSOR_001",
+  "facilityId": "FACILITY_001",
+  "sensorType": "TEMPERATURE",
+  "readings": {
+    "temperature": 25.5,
+    "humidity": 65
+  }
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.status]"
+                is="#[MunitTools::equalTo('PROCESSED')]"
+                message="Expected PROCESSED status for generic sensor"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.message]"
+                is="#[MunitTools::equalTo('Sensor data received and stored')]"
+                message="Expected confirmation message"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

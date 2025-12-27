@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="fleet-coordination-test-suite.xml" />
+
+    <!-- Test Suite for Fleet Environmental Coordination -->
+
+    <!-- Test: Get Driver Safety Alerts - Success -->
+    <munit:test name="get-driver-safety-alerts-success-test"
+                description="Test successful retrieval of driver safety alerts">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/driver-safety-alerts">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.driverSafetyAlerts]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected driver safety alerts array"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected summary object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary.totalActiveDrivers]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected total active drivers count"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Route Optimization - Success -->
+    <munit:test name="get-route-optimization-success-test"
+                description="Test successful retrieval of route optimization">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/route-optimization">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"origin" : "New York",
+	"destination" : "Boston",
+	"vehicleId" : "TRUCK_001"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected route optimization object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.vehicleId]"
+                is="#[MunitTools::equalTo('TRUCK_001')]"
+                message="Expected vehicleId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.origin]"
+                is="#[MunitTools::equalTo('New York')]"
+                message="Expected origin to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.destination]"
+                is="#[MunitTools::equalTo('Boston')]"
+                message="Expected destination to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.currentRoute]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected current route data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Route Optimization - Default Parameters -->
+    <munit:test name="get-route-optimization-default-params-test"
+                description="Test route optimization with default parameters">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/route-optimization">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.origin]"
+                is="#[MunitTools::equalTo('New York')]"
+                message="Expected default origin 'New York'"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.destination]"
+                is="#[MunitTools::equalTo('Boston')]"
+                message="Expected default destination 'Boston'"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.vehicleId]"
+                is="#[MunitTools::equalTo('TRUCK_001')]"
+                message="Expected default vehicle ID"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Driver Safety Alerts - Environmental Risk Assessment -->
+    <munit:test name="driver-safety-alerts-environmental-risk-test"
+                description="Test driver safety alerts include environmental risk data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/driver-safety-alerts">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.summary.criticalAlerts]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected critical alerts count"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary.recommendedActions]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected recommended actions object"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Route Optimization - Environmental Factors -->
+    <munit:test name="route-optimization-environmental-factors-test"
+                description="Test route optimization includes environmental factors">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/route-optimization">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"origin" : "Chicago",
+	"destination" : "Detroit",
+	"vehicleId" : "TRUCK_002"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.currentRoute.environmentalFactors]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected environmental factors in route data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.alternativeRoute]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alternative route recommendations"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.recommendations]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected route recommendations"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Route Optimization - High Risk Conditions -->
+    <munit:test name="route-optimization-high-risk-test"
+                description="Test route optimization detects high risk environmental conditions">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-coordination/route-optimization">
+                <http:query-params><![CDATA[#[output application/java
+---
+{
+	"vehicleId" : "TRUCK_003"
+}]]]></http:query-params>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.currentRoute.riskScore]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk score in route data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.routeOptimization.alternativeRoute.recommended]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alternative route recommendation status"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="fleet-monitoring-test-suite.xml" />
+
+    <!-- Test Suite for Fleet Monitoring API -->
+
+    <!-- Test: Get Fleet Monitoring Data - Success -->
+    <munit:test name="get-fleet-monitoring-data-success-test"
+                description="Test successful retrieval of fleet monitoring data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected data array"/>
+
+            <munit-tools:assert-that
+                expression="#[sizeOf(payload.data)]"
+                is="#[MunitTools::greaterThan(0)]"
+                message="Expected at least one vehicle"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected metadata object"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Vehicle - Success -->
+    <munit:test name="get-single-vehicle-success-test"
+                description="Test successful retrieval of single vehicle data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error for non-specific vehicle (default implementation)"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Driver Performance - Success -->
+    <munit:test name="get-driver-performance-success-test"
+                description="Test successful retrieval of driver performance metrics">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/driver-performance">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.driverPerformance]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected driver performance object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected summary object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary.totalDrivers]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected total drivers count"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Fleet Alerts - Success -->
+    <munit:test name="get-fleet-alerts-success-test"
+                description="Test successful retrieval of fleet alerts">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-alerts">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.alerts]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alerts array"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected summary object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.summary.totalAlerts]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected total alerts count"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Post Fleet Alert - Success -->
+    <munit:test name="post-fleet-alert-success-test"
+                description="Test successful creation of fleet alert">
+
+        <munit:execution>
+            <http:request method="POST" config-ref="HTTP_Request_configuration"
+                         path="/fleet-alerts">
+                <http:body><![CDATA[#[output application/json
+---
+{
+  "vehicleId": "TRUCK_001",
+  "alertType": "MAINTENANCE",
+  "severity": "HIGH",
+  "message": "Scheduled maintenance required"
+}]]]></http:body>
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.message]"
+                is="#[MunitTools::equalTo('Fleet alert created successfully')]"
+                message="Expected success message"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.alertId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected alert ID to be generated"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Enhanced Fleet Monitoring - Success -->
+    <munit:test name="get-enhanced-fleet-monitoring-success-test"
+                description="Test enhanced fleet monitoring with environmental context">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring/enhanced">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected data array"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.environmentalDataIncluded]"
+                is="#[MunitTools::equalTo(true)]"
+                message="Expected environmental data to be included"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Fleet Monitoring - Vehicle Telematics Data -->
+    <munit:test name="fleet-monitoring-vehicle-telematics-test"
+                description="Test fleet monitoring includes vehicle telematics data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.data[0].telematicsData]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected telematics data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].telematicsData.speed]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected speed data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].telematicsData.engineStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected engine status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].telematicsData.fuelEfficiency]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected fuel efficiency data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Fleet Monitoring - Driver Metrics -->
+    <munit:test name="fleet-monitoring-driver-metrics-test"
+                description="Test fleet monitoring includes driver metrics">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.data[0].driverMetrics]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected driver metrics"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].driverMetrics.hoursOnDuty]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected hours on duty"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].driverMetrics.safetyScore]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected safety score"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Fleet Monitoring - Risk Assessment -->
+    <munit:test name="fleet-monitoring-risk-assessment-test"
+                description="Test fleet monitoring includes risk assessment">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.data[0].riskAssessment]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk assessment"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].riskAssessment.riskScore]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk score"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].riskAssessment.status]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.riskSummary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk summary in metadata"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Enhanced Fleet Monitoring - Environmental Context -->
+    <munit:test name="enhanced-fleet-monitoring-environmental-context-test"
+                description="Test enhanced fleet monitoring includes environmental context">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/fleet-monitoring/enhanced">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.data[0].environmentalContext]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected environmental context"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].enhancedRiskAssessment]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected enhanced risk assessment"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].enhancedRiskAssessment.combinedRiskScore]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected combined risk score"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

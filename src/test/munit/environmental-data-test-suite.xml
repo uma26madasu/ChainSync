@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="environmental-data-test-suite.xml" />
+
+    <!-- Test Suite for Environmental Data Endpoints -->
+
+    <!-- Test: Get All Environmental Data - Success -->
+    <munit:test name="get-all-environmental-data-success-test"
+                description="Test successful retrieval of all environmental monitoring data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected data array"/>
+
+            <munit-tools:assert-that
+                expression="#[sizeOf(payload.data)]"
+                is="#[MunitTools::greaterThan(0)]"
+                message="Expected at least one environmental station"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected metadata object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.totalStations]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected total stations count"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Station Environmental Data - Success -->
+    <munit:test name="get-single-station-environmental-data-success-test"
+                description="Test successful retrieval of single station data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/NYC_CENTRAL_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.stationId]"
+                is="#[MunitTools::equalTo('NYC_CENTRAL_001')]"
+                message="Expected stationId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.city]"
+                is="#[MunitTools::equalTo('New York')]"
+                message="Expected city to be New York"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.weather]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected weather data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.airQuality]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected air quality data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.riskAssessment]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk assessment data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Station - Not Found -->
+    <munit:test name="get-single-station-not-found-test"
+                description="Test error response for non-existent station">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/NONEXISTENT_STATION">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('STATION_NOT_FOUND')]"
+                message="Expected STATION_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Environmental Data - Weather Parameters -->
+    <munit:test name="environmental-data-weather-parameters-test"
+                description="Test environmental data includes complete weather parameters">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/NYC_CENTRAL_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.weather.temperature]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected temperature data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.weather.humidity]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected humidity data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.weather.pressure]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected pressure data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.weather.windSpeed]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected wind speed data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.weather.visibility]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected visibility data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Environmental Data - Air Quality Parameters -->
+    <munit:test name="environmental-data-air-quality-parameters-test"
+                description="Test environmental data includes complete air quality parameters">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/NYC_CENTRAL_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.airQuality.aqi]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected AQI value"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.airQuality.level]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected AQI level"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.airQuality.pollutants]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected pollutants data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.airQuality.pollutants.pm25]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected PM2.5 data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.airQuality.pollutants.pm10]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected PM10 data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Environmental Data - Risk Assessment -->
+    <munit:test name="environmental-data-risk-assessment-test"
+                description="Test environmental data includes risk assessment">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.metadata.riskSummary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk summary in metadata"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.riskSummary.criticalStations]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected critical stations count"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.riskSummary.highRiskStations]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected high risk stations count"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Environmental Data - Coordinates -->
+    <munit:test name="environmental-data-coordinates-test"
+                description="Test environmental data includes geographic coordinates">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data/NYC_CENTRAL_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.coordinates]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected coordinates object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinates.latitude]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected latitude value"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinates.longitude]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected longitude value"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Environmental Data - Timestamp -->
+    <munit:test name="environmental-data-timestamp-test"
+                description="Test environmental data includes timestamp information">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-data">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.metadata.lastUpdated]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected last updated timestamp in metadata"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data[0].timestamp]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected timestamp for each station data"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>

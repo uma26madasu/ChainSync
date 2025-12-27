@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="service-vehicles-test-suite.xml" />
+
+    <!-- Test Suite for Environmental Service Vehicles -->
+
+    <!-- Test: Get All Environmental Service Vehicles - Success -->
+    <munit:test name="get-all-environmental-service-vehicles-success-test"
+                description="Test successful retrieval of all environmental service vehicles">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.data]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected data array"/>
+
+            <munit-tools:assert-that
+                expression="#[sizeOf(payload.data)]"
+                is="#[MunitTools::greaterThan(0)]"
+                message="Expected at least one service vehicle"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected metadata object"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Environmental Service Vehicle - Success -->
+    <munit:test name="get-single-environmental-service-vehicle-success-test"
+                description="Test successful retrieval of single service vehicle">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.statusCode]"
+                is="#[MunitTools::equalTo(200)]"
+                message="Expected HTTP 200 status code"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.vehicleId]"
+                is="#[MunitTools::equalTo('TRUCK_001')]"
+                message="Expected vehicleId to match request"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.vehicleType]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected vehicle type"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emergencyCapability]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected emergency capability data"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Get Single Service Vehicle - Not Found -->
+    <munit:test name="get-single-service-vehicle-not-found-test"
+                description="Test error response for non-existent vehicle">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/NONEXISTENT_VEHICLE">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected error object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo('VEHICLE_NOT_FOUND')]"
+                message="Expected VEHICLE_NOT_FOUND error code"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Service Vehicle - Vehicle Capacity -->
+    <munit:test name="service-vehicle-capacity-test"
+                description="Test service vehicle includes capacity information">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.vehicleCapacity]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected vehicle capacity object"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.vehicleCapacity.maxCapacity]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected max capacity"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.vehicleCapacity.currentLoad]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected current load"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.vehicleCapacity.loadType]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected load type"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Service Vehicle - Emergency Capability -->
+    <munit:test name="service-vehicle-emergency-capability-test"
+                description="Test service vehicle includes emergency capability">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.emergencyCapability.emergencyResponse]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected emergency response capability"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emergencyCapability.responseType]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected response type array"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emergencyCapability.responseTime]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected response time"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.emergencyCapability.availabilityStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected availability status"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Service Vehicle - Operational Data -->
+    <munit:test name="service-vehicle-operational-data-test"
+                description="Test service vehicle includes operational data">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.operationalData]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected operational data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.operationalData.speed]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected speed data"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.operationalData.engineStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected engine status"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.operationalData.fuelLevel]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected fuel level"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.operationalData.equipmentStatus]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected equipment status"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Service Vehicles - Metadata -->
+    <munit:test name="service-vehicles-metadata-test"
+                description="Test service vehicles list includes metadata">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.metadata.totalVehicles]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected total vehicles count"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.riskSummary]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected risk summary"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.metadata.lastUpdated]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected last updated timestamp"/>
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- Test: Service Vehicle - Location and Service Area -->
+    <munit:test name="service-vehicle-location-service-area-test"
+                description="Test service vehicle includes location and service area">
+
+        <munit:execution>
+            <http:request method="GET" config-ref="HTTP_Request_configuration"
+                         path="/environmental-service-vehicles/TRUCK_001">
+                <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer test-token"
+}]]]></http:headers>
+            </http:request>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.location]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected location"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.serviceArea]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected service area"/>
+
+            <munit-tools:assert-that
+                expression="#[payload.coordinates]"
+                is="#[MunitTools::notNullValue()]"
+                message="Expected coordinates"/>
+        </munit:validation>
+
+    </munit:test>
+
+</mule>
